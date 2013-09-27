@@ -2,12 +2,17 @@ import threading
 from threading import Timer
 import time
 
-def hello():
-	time.sleep(60)
-	print "Hello!!"
+l = threading.Lock()
 
+def hello():
+	time.sleep(10)
+	l.acquire()
+	print "Hello!!"
+	l.release()
 
 
 for i in range(0,1000):
 	print "starting timer " + str(i)
-	threading.Thread(target=hello).start()
+	self = threading.Thread(target=hello)
+	#self.setDaemon(True)
+	self.start()
