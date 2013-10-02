@@ -2,6 +2,10 @@ import os
 from pyinotify import WatchManager, Notifier, ThreadedNotifier, EventsCodes, ProcessEvent
 import pyinotify
 import string, random
+import sys
+import daemon
+import datetime
+
 
 auth = 8 # number of chars for username/password
 wm = WatchManager()
@@ -20,26 +24,33 @@ class PTmp(ProcessEvent):
             f.write(password) #print password to file.. Format: username/password
             f.close()
 
-        #def process_IN_DELETE(self, event):       # couldn't get this event to trigger
-         #   print "Remove: %s" %  os.path.join(event.path, event.name)
-            #if event.name == 'done.txt':
-         #   notifier.stop()
+    def process_IN_DELETE(self, event):       # couldn't get this event to trigger
+        print 'REMOVED: %s' % os.path.join(event.path,event.name)
+        if event.name == 'done.txt':
+           notifier.stop()
+           sys.exit()
 
+def go():
+    fi.write("["+str(datetime.datetime.now())+"]" + "GOGOGO\n")
+    while True:  # loop forever
+        #fi.write("Made it into loop\n")
+        try:
+            # process the queue of events as explained above
+            notifier.process_events()
+            if notifier.check_events():
+                # read notified events and enqeue them
+                notifier.read_events()
+            # you can do some tasks here...
+        except KeyboardInterrupt:
+            # destroy the inotify's instance on this interrupt (stop monitoring)
+            notifier.stop()
+            break
 
 
 notifier = Notifier(wm, PTmp())
 
 wdd = wm.add_watch('monitor_me', mask, rec=True)
-
-while True:  # loop forever
-    try:
-        # process the queue of events as explained above
-        notifier.process_events()
-        if notifier.check_events():
-            # read notified events and enqeue them
-            notifier.read_events()
-        # you can do some tasks here...
-    except KeyboardInterrupt:
-        # destroy the inotify's instance on this interrupt (stop monitoring)
-        notifier.stop()
-        break
+fi = open("log.out", 'a')
+#with daemon.DaemonContext(working_directory = '.'):
+fi.write("["+str(datetime.datetime.now())+"]" + "starting with daemon context\n")
+go()
