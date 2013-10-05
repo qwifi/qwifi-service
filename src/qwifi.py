@@ -1,50 +1,41 @@
-#This is just stubs right now. I'm pushing it to keep us on the same page.
-
+#!/usr/bin/python
 import MySQLdb
 import threading
 import time
-import os
-import daemon
+import sys
+from daemon import DaemonContext
+import subprocess
 
-def dropConnection:
-	#send command to system to drop connection
-	
+def dropConnection(macAddr):
+  print "Mac Address " + macAddr[0] #for testing
+  subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr[0]])
 
-def main:
-
-	while True:
-	  #query number 1 (update db to represent sessions that should be disassociated)
-    # So this is the query that inserts a new row into radcheck for the connections that
-    # have timed out. Useful for the username field.
+def main():
+  while True:
+    print "loop entry"
+    db = MySQLdb.connect("localhost","root","password","radius")
+    cursor = db.cursor()
     cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
 
-	
-	#list = query number 2 (get list of outdated connections)
-  # This set of querys will give us all the mac addresses that need to be dissassociated.
-  cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL;")
-  mac_addresses = cursor.fetchall()
-	#for connection in list:
-  sudo hostapd_cli disassociate <MACaddr>
-		#self = threading.Thread(target=f)
-	
-	  #query number 3 (clean out the radcheck table)
-    cursor.execute("SELECT username FROM radius.radcheck WHERE value = 'Reject';")
-    rows = cursor.fetchall();
+    cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL;")
+    mac_addresses = list(set(cursor.fetchall()))
+    for macAddr in mac_addresses:
+      threading.Thread(target=dropConnection(macAddr))
+    
+    cursor.execute("SELECT username FROM radius.radcheck WHERE value = \'Reject\';")
+    rows = cursor.fetchall()
 
-    # if the data is good we did find connections that should be deleted, else we did not.
-    if data:
-      count = len(rows)
-      for rows in range(0, count)
-        data = rows[row]
-        #This line below is not working for me.
-        cursor.execute("DELETE FROM radius.radcheck WHERE username = '%s';" % data)
-    else:
+    if rows:
+      for row in rows:
+        print "row " + row[0] #testing
+        cursor.execute("DELETE FROM radius.radcheck WHERE username = '%s';" % row)
 
+    db.commit()
+    time.sleep(5) #loop every 5 seconds
 
-	time.sleep(5) #loop every 5 seconds
-
-with daemon.DaemonContext(working_directory = '.'):
-	main()
+#the stdout part is for testing
+with DaemonContext(working_directory = '.', stdout=sys.stdout):
+  main()
 
 
 ###FUTURE ADAPTATIONS###
