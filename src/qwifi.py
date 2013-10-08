@@ -7,43 +7,55 @@ from daemon import DaemonContext
 import subprocess
 
 def dropConnection(macAddr):
-  print "Mac Address " + macAddr[0] #for testing
-  subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr[0]])
+  print "Mac Address " + macAddr #for testing
+  subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
 
 def main():
   while True:
     print "loop entry"
     db = MySQLdb.connect("localhost","root","password","radius")
     cursor = db.cursor()
-    cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
+
+    try:
+        cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
+        db.commit()    
+        print "updated radcheck"
+    except:
+        db.rollback()
+        print("Error updating radcheck")
 
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL;")
-    mac_addresses = list(set(cursor.fetchall()))
+    mac_addresses = set(cursor.fetchall())
     for macAddr in mac_addresses:
-      threading.Thread(target=dropConnection(macAddr))
+      threading.Thread(target=dropConnection(macAddr[0].replace('-', ':')))
     
-    cursor.execute("SELECT username FROM radius.radcheck WHERE value = \'Reject\';")
-    rows = cursor.fetchall()
+    try:
+        cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
+        db.commit()
+        print "Cleaned up radcheck"
+    except:
+        db.rollback()
+        print("Error cleaning up radcheck")
 
-    if rows:
-      for row in rows:
-        print "row " + row[0] #testing
-        cursor.execute("DELETE FROM radius.radcheck WHERE username = '%s';" % row)
-
-    db.commit()
     time.sleep(5) #loop every 5 seconds
 
 #the stdout part is for testing
-with DaemonContext(working_directory = '.', stdout=sys.stdout):
+with DaemonContext(working_directory = '.', stdout=sys.stdout, stderr=sys.stderr):
   main()
 
 
 ###FUTURE ADAPTATIONS###
- #if (the number of connections to kill) >= 100:
- #   fire off 100 dropConnection threads
- #   wait for them to finish
- #   fire off 100 more... etc etc
+#def subsets(l, n):
+    #for i in xrange(0, len(l), n):
+        #yield l[i:i+n]
 
- #Logging of DB changes and qwifi-service operations
-
- #Anything else we find
+#if len(macAddr) >= 100:
+#  for subset in subsets(mac_addresses, 100):
+#    threads = []
+#    for macAddr in subset:
+#      t = threading.Thread(target=dropConnection(macAddr))
+#      threads.append(t)
+#    [i.join() for i in threads]#wait for each thread to finish
+#else:
+#  for macAddr in mac_addresses:
+#    threading.Thread(target=dropConnection(macAddr))
