@@ -14,3 +14,6 @@ class TestQwifi(unittest.TestCase):
 	def test_updateRadcheck:
 		#run updateRadcheck (we should have expected data before and after)
 		##query radcheck and make sure the data matches what we expect
+
+if __name__ == '__main__':
+    unittest.main()
