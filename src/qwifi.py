@@ -10,38 +10,64 @@ def dropConnection(macAddr):
   print "Mac Address " + macAddr #for testing
   subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
 
-def main():
-  while True:
-    print "loop entry"
-    db = MySQLdb.connect("localhost","root","password","radius")
-    cursor = db.cursor()
+def printError(e):
+    try:
+        print "MySQL Error [%d]: %s" % (e.args[0], e.args[1])
+    except IndexError:
+        print "MySQL Error: %s" % str(e)
 
+
+def updateRadcheck(dataBase, cursor):
     try:
         cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
-        db.commit()    
+        dataBase.commit()    
         print "updated radcheck"
-    except:
-        db.rollback()
+    except MySQLdb.error, e:
+        printError(e)
+        dataBase.rollback()
         print("Error updating radcheck")
 
+def disassociate(cursor):
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL;")
     mac_addresses = set(cursor.fetchall())
     for macAddr in mac_addresses:
-      threading.Thread(target=dropConnection(macAddr[0].replace('-', ':')))
-    
+        threading.Thread(target=dropConnection(macAddr[0].replace('-', ':')))
+
+def cull(dataBase, cursor):
     try:
         cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
-        db.commit()
+        dataBase.commit()
         print "Cleaned up radcheck"
-    except:
-        db.rollback()
+    except MySQLdb.error, e:
+        printError(e)
+        dataBase.rollback()
         print("Error cleaning up radcheck")
 
+
+def main():
+  while True:
+    print "loop entry"
+    try:
+        db = MySQLdb.connect("localhost","root","password","radius")
+        cursor = db.cursor()
+    except MySQLdb.error, e:
+        printError(e)
+
+    updateRadcheck(db, cursor)#update radcheck with reject for old sessions
+    disassociate(cursor)#kick off all of the old sessions
+    cull(db, cursor)#remove unneccassery data from DB
     time.sleep(5) #loop every 5 seconds
 
-#the stdout part is for testing
+#the stdout/stderror part is for testing
 with DaemonContext(working_directory = '.', stdout=sys.stdout, stderr=sys.stderr):
   main()
+
+
+
+
+
+
+
 
 
 ###FUTURE ADAPTATIONS###
