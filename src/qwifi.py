@@ -3,29 +3,38 @@ import MySQLdb
 import threading
 import time
 import sys
+import syslog
 from daemon import DaemonContext
 import subprocess
 
+bool log = true
+
 def dropConnection(macAddr):
-  print "Mac Address " + macAddr #for testing
+  #print "Mac Address " + macAddr #for testing
+  syslog.syslog("Mac Address %s is being dropped." %macAddr)
   subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
 
 def printError(e):
     try:
         print "MySQL Error [%d]: %s" % (e.args[0], e.args[1])
+        syslog.syslog(syslog.LOG_ERR, "Unable to open the database")
     except IndexError:
         print "MySQL Error: %s" % str(e)
+        syslog.syslog(syslog.LOG_ERR, "Unable to open the database, perhaps wrong values passed in?")
 
 
 def updateRadcheck(dataBase, cursor):
     try:
         cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
+        if int(cursor.rowcount) > 0:
+          syslog.syslog("We have updated something into radcheck")
         dataBase.commit()    
         print "updated radcheck"
-    except MySQLdb.error, e:
+    except MySQLdb.Error, e:
         printError(e)
         dataBase.rollback()
         print("Error updating radcheck")
+        syslog.syslog(syslog.ERR, "Error updating radcheck table.")
 
 def disassociate(cursor):
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL;")
@@ -35,22 +44,34 @@ def disassociate(cursor):
 
 def cull(dataBase, cursor):
     try:
+        if log == true:
+          cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
+          users_culled = cursor.fetchall()
+          for user in users_culled:
+            #print "Taking out %s user from radcheck." %user
+            syslog.syslog("Taking out %s user from radcheck." %user)
+
         cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
+        if int(cursor.rowcount) > 0:
+          syslog.syslog("We have deleted %s number of things from radcheck" %cursor.rowcount)
         dataBase.commit()
         print "Cleaned up radcheck"
-    except MySQLdb.error, e:
+    except MySQLdb.Error, e:
         printError(e)
         dataBase.rollback()
         print("Error cleaning up radcheck")
+        syslog.syslog(syslog.ERR, "Error cleaning up radcheck")
 
 
 def main():
   while True:
     print "loop entry"
     try:
-        db = MySQLdb.connect("localhost","root","password","radius")
+        #db = MySQLdb.connect("localhost","root","password","radius")
+        db = MySQLdb.connect("localhost", "test", "test123", "radius")
         cursor = db.cursor()
-    except MySQLdb.error, e:
+        syslog.syslog("Started logging process on daemon.")
+    except MySQLdb.Error, e:
         printError(e)
 
     updateRadcheck(db, cursor)#update radcheck with reject for old sessions
