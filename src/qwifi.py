@@ -7,8 +7,7 @@ import syslog
 from daemon import DaemonContext
 import subprocess
 
-bool log = true
-
+log = True
 def dropConnection(macAddr):
   #print "Mac Address " + macAddr #for testing
   syslog.syslog("Mac Address %s is being dropped." %macAddr)
@@ -44,7 +43,7 @@ def disassociate(cursor):
 
 def cull(dataBase, cursor):
     try:
-        if log == true:
+        if log == True:
           cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
           users_culled = cursor.fetchall()
           for user in users_culled:
@@ -63,12 +62,12 @@ def cull(dataBase, cursor):
         syslog.syslog(syslog.ERR, "Error cleaning up radcheck")
 
 
-def main():
+def main():  
   while True:
     print "loop entry"
     try:
-        #db = MySQLdb.connect("localhost","root","password","radius")
-        db = MySQLdb.connect("localhost", "test", "test123", "radius")
+        db = MySQLdb.connect("localhost","root","password","radius")
+        #db = MySQLdb.connect("localhost", "test", "test123", "radius")
         cursor = db.cursor()
         syslog.syslog("Started logging process on daemon.")
     except MySQLdb.Error, e:
@@ -81,7 +80,7 @@ def main():
 
 #the stdout/stderror part is for testing
 with DaemonContext(working_directory = '.', stdout=sys.stdout, stderr=sys.stderr):
-  main()
+    main()
 
 
 
