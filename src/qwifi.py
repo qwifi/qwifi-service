@@ -4,7 +4,8 @@ import threading
 import time
 import sys
 import syslog
-from daemon import DaemonContext
+import daemon
+import lockfile
 from collections import namedtuple
 import subprocess
 
@@ -88,5 +89,5 @@ if len(sys.argv) > 1:
         logMode = modes.FOREGROUND
         main()
 else:
-    with DaemonContext(working_directory = '.'):
+    with daemon.DaemonContext(working_directory = '.', pidfile=lockfile.FileLock("/var/run/qwifi.pid")):
         main()
