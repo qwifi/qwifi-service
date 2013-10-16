@@ -1,4 +1,5 @@
 #!/usr/bin/python
+#For checking syslog quickly use in /var/log$ tail -f syslog
 import MySQLdb
 import threading
 import time
@@ -8,12 +9,65 @@ import daemon
 import lockfile
 from collections import namedtuple
 import subprocess
+import ConfigParser
 
 modes = ("SYSLOG","FOREGROUND")#to add a new mode we just need another tuple entry
 #create class modes with attributes that are members of modes tuple
 modes = namedtuple("modes", modes)(*range(len(modes)))
 
 logMode = modes.SYSLOG
+
+#Reading in default information from qwifi.ini
+Config = ConfigParser.ConfigParser()
+
+def ConfigDbPath(path):
+  global Config
+  if path != "":
+      Config.read("%sqwifi.ini" %path)
+      print "%sqwifi.ini" %path
+      Config.sections()
+  else:
+    Config.read("qwifi.ini")
+    Config.sections()
+
+#Helper function for ConfigParser
+def ConfigSectionMap(section):
+  dict1 = {}
+  options = Config.options(section)
+  for option in options:
+    try:
+      dict1[option] = Config.get(section, option)
+      if dict1[option] == -1:
+        print("skiping: %s" % option)
+    except:
+      print("exception on %s!" % option)
+      dict1[option] = NONE
+  return dict1
+
+#variables from qwifi.ini
+server = ""
+user = ""
+password = ""
+table = ""
+logging = ""
+
+#setting the global variables for the database variables
+def SetDbVar():
+  global server
+  global user 
+  global password 
+  global table 
+  global logging 
+
+  try: 
+    server  = ConfigSectionMap("Database")['server']
+    user = ConfigSectionMap("Database")['username']
+    password = ConfigSectionMap("Database")['password']
+    table = ConfigSectionMap("Database")['table'] 
+    logging = ConfigSectionMap("Options")['logging']
+  except ConfigParser.NoSectionError, e:
+    logError("User Error", "File does NOT exist or does NOT contain a valid section.")
+    sys.exit()
 
 def dropConnection(macAddr):
   log("dropConnection", "Mac Address %s is being dropped." %macAddr)
@@ -50,7 +104,7 @@ def cull(dataBase, cursor):
             log("cull","Taking out %s user from radcheck." %user)
         cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
         if int(cursor.rowcount) > 0:
-            log("cull","We have deleted %s number of things from radcheck" %cursor.rowcount)
+            log("cull","We have deleted %s things from radcheck" %cursor.rowcount)
         dataBase.commit()
     except MySQLdb.Error, e:
         error("cull",e)
@@ -68,12 +122,18 @@ def logError(tag, message):
     if logMode == modes.FOREGROUND:
         print("<" + tag + ">" + message)
     elif logMode == modes.SYSLOG:
-        syslog.syslog(syslog.ERR, "<" + tag + ">" + message)   
+        syslog.syslog(syslog.LOG_ERR, "<" + tag + ">" + message)   
 
-def main():  
+def main(): 
+  global server
+  global user
+  global password
+  global table
+ 
   while True:
     try:
-        db = MySQLdb.connect("localhost","root","password","radius")
+        #db = MySQLdb.connect("localhost","root","password","radius")
+        db = MySQLdb.connect(server,user,password,table)
         cursor = db.cursor()
         syslog.syslog("Started logging process on daemon.")
     except MySQLdb.Error, e:
@@ -87,7 +147,17 @@ def main():
 if len(sys.argv) > 1:
     if sys.argv[1] == "-n":
         logMode = modes.FOREGROUND
+        ConfigDbPath("")
+        SetDbVar()
         main()
+    elif sys.argv[1] == '-c':
+      try:
+        ConfigDbPath(sys.argv[2])
+      except IndexError, e:
+        logError("User Error", "I need a path to qwifi.ini that is valid.")
+        sys.exit()
+      SetDbVar()
+      main()
 else:
     with daemon.DaemonContext(working_directory = '.', pidfile=lockfile.FileLock("/var/run/qwifi.pid")):
         main()
