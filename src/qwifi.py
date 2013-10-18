@@ -167,15 +167,11 @@ args = parser.parse_args()
 
 if args.n == True:
   logMode = modes.FOREGROUND
-
-if args.c == "":
-  ConfigDbPath("")
+  ConfigDbPath(args.c)
   SetDbVar()
   main()
 else:
   ConfigDbPath(args.c)
   SetDbVar()
-  main()
-
-if args.c == "" and args.n == False:
-  with daemon.DaemonContext(working_directory = '.', pidfile=lockfile.FileLock("/var/#run/qwifi.pid")): main()
+  with daemon.DaemonContext(working_directory = '.', pidfile=lockfile.FileLock("/var/#run/qwifi.pid")): 
+    main()
