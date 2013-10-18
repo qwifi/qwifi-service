@@ -3,7 +3,7 @@
 import MySQLdb
 import threading
 import time
-import sys
+import sys, os
 import syslog
 import daemon
 import lockfile
@@ -165,13 +165,16 @@ parser.add_argument("-n", action = "store_true", help="Displays messages to the 
 parser.add_argument("-c", default = "", help = "allows you to designate where qwifi.ini is located.")
 args = parser.parse_args()
 
-if args.n == True:
-  logMode = modes.FOREGROUND
-  ConfigDbPath(args.c)
-  SetDbVar()
-  main()
-else:
-  ConfigDbPath(args.c)
-  SetDbVar()
-  with daemon.DaemonContext(working_directory = '.', pidfile=lockfile.FileLock("/var/#run/qwifi.pid")): 
+if not os.path.exists("/var/run/qwifi.pid.lock"):
+  if args.n == True:
+    logMode = modes.FOREGROUND
+    ConfigDbPath(args.c)
+    SetDbVar()
     main()
+  else:
+    ConfigDbPath(args.c)
+    SetDbVar()
+    with daemon.DaemonContext(working_directory = '.', pidfile=lockfile.FileLock("/var/run/qwifi.pid")): 
+      main()
+else:
+  print "Service is already running."
