@@ -18,17 +18,17 @@ modes = namedtuple("modes", modes)(*range(len(modes)))
 
 logMode = modes.SYSLOG
 
-#Reading in default information from qwifi.ini
+#Reading in default information from qwifi.conf
 Config = ConfigParser.ConfigParser()
 
 def ConfigDbPath(path):
   global Config
   if path != "":
-      Config.read("%sqwifi.ini" %path)
-      #print "%sqwifi.ini" %path
+      Config.read("%sqwifi.conf" %path)
+      #print "%sqwifi.conf" %path
       Config.sections()
   else:
-    Config.read("qwifi.ini")
+    Config.read("qwifi.conf")
     Config.sections()
 
 #Helper function for ConfigParser
@@ -45,7 +45,7 @@ def ConfigSectionMap(section):
       dictionary[option] = NONE
   return dictionary
 
-#variables from qwifi.ini
+#variables from qwifi.conf
 server = ""
 user = ""
 password = ""
@@ -162,7 +162,7 @@ def main():
 #parsing through the command line arguments.
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", action = "store_true", help="Displays messages to the foreground(stdout) or syslog.")
-parser.add_argument("-c", default = "", help = "allows you to designate where qwifi.ini is located.")
+parser.add_argument("-c", default = "", help = "allows you to designate where qwifi.conf is located.")
 args = parser.parse_args()
 
 if not os.path.exists("/var/run/qwifi.pid.lock"):
