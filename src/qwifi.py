@@ -141,11 +141,10 @@ def main():
  
   while True:
     try:
-        #db = MySQLdb.connect("localhost","root","password","radius")
         db = MySQLdb.connect(server,user,password,database)
     except MySQLdb.Error, e:
         error("main", e)
-        sys.exit()
+        raise
     try:
         cursor = db.cursor()
     except e:
@@ -160,23 +159,24 @@ def main():
     cull(db, cursor)#remove unneccassery data from DB
     time.sleep(5) #loop every 5 seconds
 
-#parsing through the command line arguments.
+  #parsing through the command line arguments.
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", action = "store_true", help="Displays messages to the foreground(stdout) or syslog.")
 parser.add_argument("-c", default = "", help = "allows you to designate where qwifi.conf is located.")
 args = parser.parse_args()
 
-if not os.path.exists("/var/run/qwifi.pid.lock"):
-  if args.n == True:
-    mode = modes.FOREGROUND
-    logLevel = logLevels.DEBUG
-    ConfigDbPath(args.c)
-    SetDbVar()
-    main()
-  else:
-    ConfigDbPath(args.c)
-    SetDbVar()
-    with daemon.DaemonContext(working_directory = '.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr): 
+if __name__ == '__main__':
+  if not os.path.exists("/var/run/qwifi.pid.lock"):
+    if args.n == True:
+      mode = modes.FOREGROUND
+      logLevel = logLevels.DEBUG
+      ConfigDbPath(args.c)
+      SetDbVar()
       main()
-else:
-  print "Service is already running."
+    else:
+      ConfigDbPath(args.c)
+      SetDbVar()
+      with daemon.DaemonContext(working_directory = '.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr): 
+        main()
+  else:
+    print "Service is already running."
