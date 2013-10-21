@@ -7,12 +7,15 @@ import MySQLdb
 from subprocess import call
 
 class Test1(unittest.TestCase):
+	#Set up test enviroment
 	def setup(self):
 		call(["sudo", "service", "mysql", "stop"])
 	
+	#leave my pc in a good state
 	def tearDown(self):
 		call(["sudo", "service", "mysql", "start"])
 
+	#test that SetDbVar gets the correct values from config file
 	def test_SetDbVar(self):
 		qwifi.ConfigDbPath("")
 		qwifi.SetDbVar()
@@ -22,7 +25,8 @@ class Test1(unittest.TestCase):
 		self.assertEqual(qwifi.password, 'password')
 		self.assertEqual(qwifi.logLevel, 4)
 
-	def test_DbConnectException(self):#test for graceful exception handling if mysql is off
+	#test for graceful exception handling if mysql is off
+	def test_DbConnectException(self):
   		self.assertRaises(MySQLdb.Error, qwifi.main)
 
 
