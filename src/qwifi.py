@@ -6,7 +6,7 @@ import time
 import sys, os
 import syslog
 import daemon
-import lockfile
+import daemon.pidlockfile
 from collections import namedtuple
 import subprocess
 import ConfigParser
@@ -66,7 +66,7 @@ def SetDbVar():
     password = ConfigSectionMap("Database")['password']
     database = ConfigSectionMap("Database")['database'] 
     logging = ConfigSectionMap("Options")['logging']
-  except ConfigParser.NoSectionError, e:
+  except ConfigParser.NoSectionError:
     log("User Error", "File does NOT exist or file path NOT valid.", modes.ERROR)
     sys.exit()
 
@@ -174,7 +174,7 @@ if not os.path.exists("/var/run/qwifi.pid.lock"):
   else:
     ConfigDbPath(args.c)
     SetDbVar()
-    with daemon.DaemonContext(working_directory = '.', pidfile=lockfile.FileLock("/var/run/qwifi.pid")): 
+    with daemon.DaemonContext(working_directory = '.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr): 
       main()
 else:
   print "Service is already running."
