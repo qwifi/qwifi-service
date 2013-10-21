@@ -5,7 +5,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../src'))
 import qwifi
 import MySQLdb
 from subprocess import call
-
+######################### QWIFI UNIT TEST # 1 ###############################
+#This unit test is design to test functionality(including exception handling)
+#of our qwifi service while mysql is not an active service.
+#Tests include: 
+#1)Making sure SetDbVar gets the right values from config file
+#2)A proper exception is raised when trying to connect to the database
+#############################################################################
 class Test1(unittest.TestCase):
 	#Set up test enviroment
 	def setup(self):
