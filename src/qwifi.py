@@ -6,13 +6,13 @@ import time
 import sys, os
 import syslog
 import daemon
-import lockfile
+import daemon.pidlockfile
 from collections import namedtuple
 import subprocess
 import ConfigParser
 import argparse
 
-modes = ("SYSLOG","FOREGROUND")#to add a new mode we just need another tuple entry
+modes = ("SYSLOG","FOREGROUND", "NORMAL", "ERROR", "WARNING", "DEBUG")#to add a new mode we just need another tuple entry
 #create class modes with attributes that are members of modes tuple
 modes = namedtuple("modes", modes)(*range(len(modes)))
 
@@ -66,25 +66,25 @@ def SetDbVar():
     password = ConfigSectionMap("Database")['password']
     database = ConfigSectionMap("Database")['database'] 
     logging = ConfigSectionMap("Options")['logging']
-  except ConfigParser.NoSectionError, e:
-    log("User Error", "File does NOT exist or file path NOT valid.", 2)
+  except ConfigParser.NoSectionError:
+    log("User Error", "File does NOT exist or file path NOT valid.", modes.ERROR)
     sys.exit()
 
 def dropConnection(macAddr):
-  log("dropConnection", "Mac Address %s is being dropped." %macAddr, 4)
+  log("dropConnection", "Mac Address %s is being dropped." %macAddr, modes.DEBUG)
   subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
 
 def error(tag, e):
     try:
-        log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), 2)
+        log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), modes.ERROR)
     except IndexError:
-        log(tag,"MySQL Error: %s" % str(e), 2)
+        log(tag,"MySQL Error: %s" % str(e), modes.ERROR)
         
 def updateRadcheck(dataBase, cursor):
     try:
         cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
         if int(cursor.rowcount) > 0:
-            log("updateRadcheck", "we have updated radcheck", 4)
+            log("updateRadcheck", "we have updated radcheck", modes.DEBUG)
         dataBase.commit()    
     except MySQLdb.Error, e:
         error("updateRadcheck", e)
@@ -95,7 +95,7 @@ def disassociate(cursor):
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL;")
     mac_addresses = set(cursor.fetchall())
     for macAddr in mac_addresses:
-        log("dissassociate", "dropping %s" % macAddr, 4)
+        log("dissassociate", "dropping %s" % macAddr, modes.DEBUG)
         threading.Thread(target=dropConnection(macAddr[0].replace('-', ':')))
 
 def cull(dataBase, cursor):
@@ -103,29 +103,29 @@ def cull(dataBase, cursor):
         cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
         users_culled = cursor.fetchall()
         for user in users_culled:
-            log("cull","Taking out %s user from radcheck." %user, 4)
+            log("cull","Taking out %s user from radcheck." %user, modes.DEBUG)
         cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
         if int(cursor.rowcount) > 0:
-            log("cull","We have deleted %s things from radcheck" %cursor.rowcount, 4)
+            log("cull","We have deleted %s things from radcheck" %cursor.rowcount, modes.DEBUG)
         dataBase.commit()
     except MySQLdb.Error, e:
         error("cull",e)
         dataBase.rollback() 
 
-#A general log function, the modes are 1 = normal, 2 = Error, 3 = Warning, 4 = Debug
+#A general log function, the modes are normal, Error, Warning, Debug
 def log(tag, message, mode):
     global logMode
     
     if logMode == modes.FOREGROUND:
       print ("<" + tag + ">" + message)
     else:
-      if mode == 1:
+      if mode == modes.NORMAL:
         syslog.syslog("<" + tag + ">" + message)
-      elif mode == 2:
+      elif mode == modes.ERROR:
         syslog.syslog(syslog.LOG_ERR, "<" + tag + ">" + message)
-      elif mode == 3:
+      elif mode == modes.WARNING:
         syslog.syslog(syslog.LOG_WARNING, "<" + tag + ">" + message)
-      elif mode == 4:
+      elif mode == modes.DEBUG:
         syslog.syslog(syslog.LOG_DEBUG, "<" + tag + ">" + message)
       else:
         syslog.syslog("<UNKNOWN MODE>" + message)
@@ -136,7 +136,7 @@ def main():
   global password
   global database
 
-  log('main','Started logging process on daemon', 4)
+  log('main','Started logging process on daemon', modes.DEBUG)
  
   while True:
     try:
@@ -149,7 +149,7 @@ def main():
         cursor = db.cursor()
     except e:
         print "blah."
-        log("main", e, 2)
+        log("main", e, modes.ERROR)
         sys.exit()
 
     #print "We have opened MySQLdb successfully!"
@@ -174,7 +174,7 @@ if not os.path.exists("/var/run/qwifi.pid.lock"):
   else:
     ConfigDbPath(args.c)
     SetDbVar()
-    with daemon.DaemonContext(working_directory = '.', pidfile=lockfile.FileLock("/var/run/qwifi.pid")): 
+    with daemon.DaemonContext(working_directory = '.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr): 
       main()
 else:
   print "Service is already running."
