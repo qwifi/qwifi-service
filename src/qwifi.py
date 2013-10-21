@@ -42,7 +42,7 @@ def ConfigSectionMap(section):
         print("skiping: %s" % option)
     except:
       print("exception on %s!" % option)
-      dictionary[option] = NONE
+      dictionary[option] = None
   return dictionary
 
 #variables from qwifi.conf
