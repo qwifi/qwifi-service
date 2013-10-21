@@ -12,11 +12,14 @@ import subprocess
 import ConfigParser
 import argparse
 
-modes = ("SYSLOG","FOREGROUND", "NORMAL", "ERROR", "WARNING", "DEBUG")#to add a new mode we just need another tuple entry
-#create class modes with attributes that are members of modes tuple
-modes = namedtuple("modes", modes)(*range(len(modes)))
+modes = ("DAEMON", "FOREGROUND")
+modes = namedtuple("mode", modes)(*range(len(modes)))
+mode = modes.DAEMON
 
-logMode = modes.SYSLOG
+logLevels = ("NONE", "ERROR", "WARNING", "INFO", "DEBUG")#to add a new mode we just need another tuple entry
+#create class logLevels with attributes that are members of logLevels tuple
+logLevels = namedtuple("logLevels", logLevels)(*range(len(logLevels)))
+logLevel = logLevels.WARNING
 
 #Reading in default information from qwifi.conf
 Config = ConfigParser.ConfigParser()
@@ -58,33 +61,33 @@ def SetDbVar():
   global user 
   global password 
   global database 
-  global logging 
+  global logLevel 
 
   try: 
-    server  = ConfigSectionMap("Database")['server']
-    user = ConfigSectionMap("Database")['username']
-    password = ConfigSectionMap("Database")['password']
-    database = ConfigSectionMap("Database")['database'] 
-    logging = ConfigSectionMap("Options")['logging']
+    server  = ConfigSectionMap("database")['server']
+    user = ConfigSectionMap("database")['username']
+    password = ConfigSectionMap("database")['password']
+    database = ConfigSectionMap("database")['database'] 
+    logLevel = logLevels._asdict()[ConfigSectionMap("logging")['level'].upper()]
   except ConfigParser.NoSectionError:
-    log("User Error", "File does NOT exist or file path NOT valid.", modes.ERROR)
-    sys.exit()
+    print "User Error", "File does NOT exist or file path NOT valid."
+    sys.exit(1)
 
 def dropConnection(macAddr):
-  log("dropConnection", "Mac Address %s is being dropped." %macAddr, modes.DEBUG)
+  log("dropConnection", "Mac Address %s is being dropped." %macAddr, logLevels.DEBUG)
   subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
 
 def error(tag, e):
     try:
-        log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), modes.ERROR)
+        log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), logLevels.ERROR)
     except IndexError:
-        log(tag,"MySQL Error: %s" % str(e), modes.ERROR)
+        log(tag,"MySQL Error: %s" % str(e), logLevels.ERROR)
         
 def updateRadcheck(dataBase, cursor):
     try:
         cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
         if int(cursor.rowcount) > 0:
-            log("updateRadcheck", "we have updated radcheck", modes.DEBUG)
+            log("updateRadcheck", "we have updated radcheck", logLevels.DEBUG)
         dataBase.commit()    
     except MySQLdb.Error, e:
         error("updateRadcheck", e)
@@ -95,7 +98,7 @@ def disassociate(cursor):
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL;")
     mac_addresses = set(cursor.fetchall())
     for macAddr in mac_addresses:
-        log("dissassociate", "dropping %s" % macAddr, modes.DEBUG)
+        log("dissassociate", "dropping %s" % macAddr, logLevels.DEBUG)
         threading.Thread(target=dropConnection(macAddr[0].replace('-', ':')))
 
 def cull(dataBase, cursor):
@@ -103,32 +106,30 @@ def cull(dataBase, cursor):
         cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
         users_culled = cursor.fetchall()
         for user in users_culled:
-            log("cull","Taking out %s user from radcheck." %user, modes.DEBUG)
+            log("cull","Taking out %s user from radcheck." %user, logLevels.DEBUG)
         cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
         if int(cursor.rowcount) > 0:
-            log("cull","We have deleted %s things from radcheck" %cursor.rowcount, modes.DEBUG)
+            log("cull","We have deleted %s things from radcheck" %cursor.rowcount, logLevels.DEBUG)
         dataBase.commit()
     except MySQLdb.Error, e:
         error("cull",e)
         dataBase.rollback() 
 
 #A general log function, the modes are normal, Error, Warning, Debug
-def log(tag, message, mode):
-    global logMode
-    
-    if logMode == modes.FOREGROUND:
-      print ("<" + tag + ">" + message)
+def log(tag, message, level):
+  if mode == modes.FOREGROUND:
+  	print "<" + tag + ">" + message
+  if level != logLevels.NONE and level <= logLevel:
+    if level == logLevels.ERROR:
+      syslog.syslog(syslog.LOG_ERR, "<" + tag + ">" + message)
+    elif level == logLevels.WARNING:
+      syslog.syslog(syslog.LOG_WARNING, "<" + tag + ">" + message)
+    elif level == logLevels.INFO:
+      syslog.syslog(syslog.LOG_INFO, "<" + tag + ">" + message)
+    elif level == logLevels.DEBUG:
+      syslog.syslog(syslog.LOG_DEBUG, "<" + tag + ">" + message)
     else:
-      if mode == modes.NORMAL:
-        syslog.syslog("<" + tag + ">" + message)
-      elif mode == modes.ERROR:
-        syslog.syslog(syslog.LOG_ERR, "<" + tag + ">" + message)
-      elif mode == modes.WARNING:
-        syslog.syslog(syslog.LOG_WARNING, "<" + tag + ">" + message)
-      elif mode == modes.DEBUG:
-        syslog.syslog(syslog.LOG_DEBUG, "<" + tag + ">" + message)
-      else:
-        syslog.syslog("<UNKNOWN MODE>" + message)
+      syslog.syslog("<UNKNOWN MODE>" + message)
 
 def main(): 
   global server
@@ -136,7 +137,7 @@ def main():
   global password
   global database
 
-  log('main','Started logging process on daemon', modes.DEBUG)
+  log('main','Started logging process on daemon', logLevels.DEBUG)
  
   while True:
     try:
@@ -149,7 +150,7 @@ def main():
         cursor = db.cursor()
     except e:
         print "blah."
-        log("main", e, modes.ERROR)
+        log("main", e, logLevels.ERROR)
         sys.exit()
 
     #print "We have opened MySQLdb successfully!"
@@ -167,7 +168,8 @@ args = parser.parse_args()
 
 if not os.path.exists("/var/run/qwifi.pid.lock"):
   if args.n == True:
-    logMode = modes.FOREGROUND
+    mode = modes.FOREGROUND
+    logLevel = logLevels.DEBUG
     ConfigDbPath(args.c)
     SetDbVar()
     main()
