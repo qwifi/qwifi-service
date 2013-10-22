@@ -26,7 +26,7 @@ Config = ConfigParser.ConfigParser()
 def ConfigDbPath(path):
     global Config
     if path != "":
-        Config.read("%sqwifi.conf" % path)
+        Config.read(path)
         # print "%sqwifi.conf" %path
         Config.sections()
     else:
