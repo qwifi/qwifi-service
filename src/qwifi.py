@@ -156,15 +156,15 @@ parser.add_argument("-c", default="qwifi.conf", help="allows you to designate wh
 args = parser.parse_args()
 
 if __name__ == '__main__':
-  if not os.path.exists("/var/run/qwifi.pid.lock"):
-    if args.n == True:
-        mode = modes.FOREGROUND
-        logLevel = logLevels.DEBUG
-        parseConfigFile(args.c)
-        main()
-    else:
-        parseConfigFile(args.c)
-        with daemon.DaemonContext(working_directory='.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr):
+    if not os.path.exists("/var/run/qwifi.pid.lock"):
+        if args.n == True:
+            mode = modes.FOREGROUND
+            logLevel = logLevels.DEBUG
+            parseConfigFile(args.c)
             main()
-  else:
-    print "Service is already running."
+        else:
+            parseConfigFile(args.c)
+            with daemon.DaemonContext(working_directory='.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr):
+                main()
+    else:
+        print "Service is already running."
