@@ -20,18 +20,7 @@ logLevels = ("NONE", "ERROR", "WARNING", "INFO", "DEBUG")  # to add a new mode w
 logLevels = namedtuple("logLevels", logLevels)(*range(len(logLevels)))
 logLevel = logLevels.WARNING
 
-# Reading in default information from qwifi.conf
 Config = ConfigParser.ConfigParser()
-
-def ConfigDbPath(path):
-    global Config
-    if path != "":
-        Config.read(path)
-        # print "%sqwifi.conf" %path
-        Config.sections()
-    else:
-        Config.read("qwifi.conf")
-        Config.sections()
 
 # Helper function for ConfigParser
 def ConfigSectionMap(section):
@@ -54,13 +43,15 @@ password = ""
 database = ""
 logging = ""
 
-# setting the global variables for the database variables
-def SetDbVar():
+# set global configuration variables from configuration file
+def parseConfigFile(path):
     global server
     global user
     global password
     global database
     global logLevel
+
+    Config.read(path)
 
     try:
         server = ConfigSectionMap("database")['server']
@@ -161,7 +152,7 @@ def main():
 # parsing through the command line arguments.
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", action="store_true", help="Displays messages to the foreground(stdout) or syslog.")
-parser.add_argument("-c", default="", help="allows you to designate where qwifi.conf is located.")
+parser.add_argument("-c", default="qwifi.conf", help="allows you to designate where qwifi.conf is located.")
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -169,12 +160,10 @@ if __name__ == '__main__':
     if args.n == True:
         mode = modes.FOREGROUND
         logLevel = logLevels.DEBUG
-        ConfigDbPath(args.c)
-        SetDbVar()
+        parseConfigFile(args.c)
         main()
     else:
-        ConfigDbPath(args.c)
-        SetDbVar()
+        parseConfigFile(args.c)
         with daemon.DaemonContext(working_directory='.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr):
             main()
   else:
