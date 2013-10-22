@@ -143,7 +143,7 @@ def main():
             db = MySQLdb.connect(server, user, password, database)
         except MySQLdb.Error, e:
             error("main", e)
-        raise
+            raise
         try:
             cursor = db.cursor()
         except e:
