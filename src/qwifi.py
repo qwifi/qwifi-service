@@ -108,18 +108,18 @@ def cull(dataBase, cursor):
 # A general log function, the modes are normal, Error, Warning, Debug
 def log(tag, message, level):
     if mode == modes.FOREGROUND:
-        print "<" + tag + ">" + message
+        print "[" + tag + "]" + message
     if level != logLevels.NONE and level <= logLevel:
         if level == logLevels.ERROR:
-            syslog.syslog(syslog.LOG_ERR, "<" + tag + ">" + message)
+            syslog.syslog(syslog.LOG_ERR, "[" + tag + "]" + message)
         elif level == logLevels.WARNING:
-            syslog.syslog(syslog.LOG_WARNING, "<" + tag + ">" + message)
+            syslog.syslog(syslog.LOG_WARNING, "[" + tag + "]" + message)
         elif level == logLevels.INFO:
-            syslog.syslog(syslog.LOG_INFO, "<" + tag + ">" + message)
+            syslog.syslog(syslog.LOG_INFO, "[" + tag + "]" + message)
         elif level == logLevels.DEBUG:
-            syslog.syslog(syslog.LOG_DEBUG, "<" + tag + ">" + message)
+            syslog.syslog(syslog.LOG_DEBUG, "[" + tag + "]" + message)
         else:
-            syslog.syslog("<UNKNOWN MODE>" + message)
+            syslog.syslog("[UNKNOWN MODE]" + message)
 
 def main():
     global server
