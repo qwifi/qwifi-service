@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import unittest
 import sys
 import os
@@ -57,6 +58,7 @@ class DataBaseTest(unittest.TestCase):
         qwifi.updateRadcheck(db, cursor)
         cursor.execute("SELECT * from radcheck;")
         self.assertEqual(len(cursor.fetchall()), 6)
+        db.close()
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
 
 
