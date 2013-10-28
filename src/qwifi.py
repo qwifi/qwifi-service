@@ -64,12 +64,18 @@ def parseConfigFile(path):
         sys.exit(1)
 
 def dropConnection(macAddr):
-    log("dropConnection", "Mac Address %s is being dropped." % macAddr, logLevels.DEBUG)
-    subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
+    Value = subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
+
+    if Value == 0:
+    # We dropped the connection successfully
+        log("dropConnection", "Mac Address %s is being dropped." % macAddr, logLevels.DEBUG)
+    else:
+        log("dropConnection", "An error occured while dropping the Mac Address of: %s" % macAddr, logLevels.ERROR)
 
 def error(tag, e):
     try:
         log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), logLevels.ERROR)
+        sys.exit()
     except IndexError:
         log(tag, "MySQL Error: %s" % str(e), logLevels.ERROR)
 
@@ -142,7 +148,7 @@ def main():
             log("main", e, logLevels.ERROR)
             sys.exit()
 
-    # print "We have opened MySQLdb successfully!"
+        #print "We have opened MySQLdb successfully!"
 
         updateRadcheck(db, cursor)  # update radcheck with reject for old sessions
         disassociate(cursor)  # kick off all of the old sessions
