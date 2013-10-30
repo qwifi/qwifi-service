@@ -14,7 +14,7 @@ class DataBaseTest(unittest.TestCase):
     #test that parseConfigFile gets the correct values from config file
     def test_ParseConfigFile(self):
         #load config file
-        qwifi.parseConfigFile("test.conf")
+        qwifi.parse_config_file("test.conf")
         #make sure the expected values were loaded
         self.assertEqual(qwifi.server, 'localhost')
         self.assertEqual(qwifi.user,'root')
@@ -23,7 +23,7 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(qwifi.logLevel, 4)
     
     def test_DissasociateQuery(self):
-        qwifi.parseConfigFile("qwifi.conf")
+        qwifi.parse_config_file("qwifi.conf")
         #backup current radius database
         os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
         #load the test database
@@ -45,7 +45,7 @@ class DataBaseTest(unittest.TestCase):
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
 
     def test_Cull(self):
-        qwifi.parseConfigFile("qwifi.conf")
+        qwifi.parse_config_file("qwifi.conf")
         os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
         db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
@@ -73,7 +73,7 @@ class DataBaseTest(unittest.TestCase):
        call(["sudo", "service", "mysql", "start"])
 
     def test_RadiusExists(self):
-        qwifi.parseConfigFile("qwifi.conf")
+        qwifi.parse_config_file("qwifi.conf")
         db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
         cursor = db.cursor()
         cursor.execute("SHOW DATABASES LIKE 'radius'")
@@ -82,7 +82,7 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(len(rad),1)
 
     def test_TablesExist(self):
-        qwifi.parseConfigFile("qwifi.conf")
+        qwifi.parse_config_file("qwifi.conf")
         db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
         cursor = db.cursor()
         #these queries should all return a tuple of length 1
@@ -102,13 +102,13 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(len(cursor.fetchall()),1)
 
     def test_UpdateRadcheck(self):
-        qwifi.parseConfigFile("qwifi.conf")
+        qwifi.parse_config_file("qwifi.conf")
         os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
         db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
         cursor = db.cursor()
         #let updateRadcheck do it's job
-        qwifi.updateRadcheck(db, cursor)
+        qwifi.update_rad_check(db, cursor)
         #three new entries should be added to radcheck 3 (original) + 3 (new) == 6 entries
         cursor.execute("SELECT * from radcheck;")
         self.assertEqual(len(cursor.fetchall()), 6)
