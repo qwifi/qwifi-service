@@ -1,7 +1,7 @@
 *.py[cod]
 
 unit-test/qwifi.conf
-
+unit-test/backup.sql
 # C extensions
 *.so
 
