@@ -74,7 +74,6 @@ def drop_connection(macAddr):
 def error(tag, e):
     try:
         log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), logLevels.ERROR)
-        sys.exit()
     except IndexError:
         log(tag, "MySQL Error: %s" % str(e), logLevels.ERROR)
 
@@ -145,7 +144,7 @@ def main():
         except e:
             print "blah."
             log("main", e, logLevels.ERROR)
-            sys.exit()
+            raise
 
         #print "We have opened MySQLdb successfully!"
 
