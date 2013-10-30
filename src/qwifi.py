@@ -23,7 +23,7 @@ logLevel = logLevels.WARNING
 Config = ConfigParser.ConfigParser()
 
 # Helper function for ConfigParser
-def ConfigSectionMap(section):
+def config_section_map(section):
     dictionary = {}
     options = Config.options(section)
     for option in options:
@@ -44,7 +44,7 @@ database = ""
 logging = ""
 
 # set global configuration variables from configuration file
-def parseConfigFile(path):
+def parse_config_file(path):
     global server
     global user
     global password
@@ -54,33 +54,38 @@ def parseConfigFile(path):
     Config.read(path)
 
     try:
-        server = ConfigSectionMap("database")['server']
-        user = ConfigSectionMap("database")['username']
-        password = ConfigSectionMap("database")['password']
-        database = ConfigSectionMap("database")['database']
-        logLevel = logLevels._asdict()[ConfigSectionMap("logging")['level'].upper()]
+        server = config_section_map("database")['server']
+        user = config_section_map("database")['username']
+        password = config_section_map("database")['password']
+        database = config_section_map("database")['database']
+        logLevel = logLevels._asdict()[config_section_map("logging")['level'].upper()]
     except ConfigParser.NoSectionError:
         print "User Error", "File does NOT exist or file path NOT valid."
         sys.exit(1)
 
-def dropConnection(macAddr):
-    log("dropConnection", "Mac Address %s is being dropped." % macAddr, logLevels.DEBUG)
-    subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
+def drop_connection(macAddr):
+    drop_return = subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
+
+    if drop_return == 0:  # We dropped the connection successfully
+        log("drop_connection", "Mac Address %s is being dropped." % macAddr, logLevels.DEBUG)
+    else:
+        log("drop_connection", "An error occured while dropping the Mac Address of: %s" % macAddr, logLevels.ERROR)
 
 def error(tag, e):
     try:
         log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), logLevels.ERROR)
+        sys.exit()
     except IndexError:
         log(tag, "MySQL Error: %s" % str(e), logLevels.ERROR)
 
-def updateRadcheck(dataBase, cursor):
+def update_rad_check(dataBase, cursor):
     try:
         cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
         if int(cursor.rowcount) > 0:
-            log("updateRadcheck", "we have updated radcheck", logLevels.DEBUG)
+            log("update_rad_check", "we have updated radcheck", logLevels.DEBUG)
         dataBase.commit()
     except MySQLdb.Error, e:
-        error("updateRadcheck", e)
+        error("update_rad_check", e)
         dataBase.rollback()
         sys.exit()
 
@@ -89,7 +94,7 @@ def disassociate(cursor):
     mac_addresses = set(cursor.fetchall())
     for macAddr in mac_addresses:
         log("dissassociate", "dropping %s" % macAddr, logLevels.DEBUG)
-        threading.Thread(target=dropConnection(macAddr[0].replace('-', ':')))
+        threading.Thread(target=drop_connection(macAddr[0].replace('-', ':')))
 
 def cull(dataBase, cursor):
     try:
@@ -142,9 +147,9 @@ def main():
             log("main", e, logLevels.ERROR)
             sys.exit()
 
-    # print "We have opened MySQLdb successfully!"
+        #print "We have opened MySQLdb successfully!"
 
-        updateRadcheck(db, cursor)  # update radcheck with reject for old sessions
+        update_rad_check(db, cursor)  # update radcheck with reject for old sessions
         disassociate(cursor)  # kick off all of the old sessions
         cull(db, cursor)  # remove unneccassery data from DB
         time.sleep(5)  # loop every 5 seconds
@@ -160,10 +165,10 @@ if __name__ == '__main__':
         if args.n == True:
             mode = modes.FOREGROUND
             logLevel = logLevels.DEBUG
-            parseConfigFile(args.c)
+            parse_config_file(args.c)
             main()
         else:
-            parseConfigFile(args.c)
+            parse_config_file(args.c)
             with daemon.DaemonContext(working_directory='.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr):
                 main()
     else:
