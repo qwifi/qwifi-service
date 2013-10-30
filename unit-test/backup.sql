@@ -67,7 +67,7 @@ CREATE TABLE `radacct` (
 
 LOCK TABLES `radacct` WRITE;
 /*!40000 ALTER TABLE `radacct` DISABLE KEYS */;
-INSERT INTO `radacct` VALUES (47,'','','user1','','','',NULL,NULL,'2013-10-25 12:43:34',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'','','',NULL,NULL,'',NULL,NULL,NULL),(48,'','','user2','','','',NULL,NULL,'2013-10-25 12:46:41',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'','','',NULL,NULL,'',NULL,NULL,NULL),(49,'','','user3','','','',NULL,NULL,'2013-10-25 12:46:48',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'','','',NULL,NULL,'',NULL,NULL,NULL);
+INSERT INTO `radacct` VALUES (47,'','','user1','','','',NULL,NULL,'2013-10-25 12:43:34',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'','1','',NULL,NULL,'',NULL,NULL,NULL),(48,'','','user2','','','',NULL,NULL,'2013-10-25 12:46:41',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'','2','',NULL,NULL,'',NULL,NULL,NULL),(49,'','','user3','','','',NULL,NULL,'2013-10-25 12:46:48',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'','3','',NULL,NULL,'',NULL,NULL,NULL);
 /*!40000 ALTER TABLE `radacct` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -86,7 +86,7 @@ CREATE TABLE `radcheck` (
   `value` varchar(253) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   KEY `username` (`username`(32))
-) ENGINE=InnoDB AUTO_INCREMENT=67 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -95,7 +95,7 @@ CREATE TABLE `radcheck` (
 
 LOCK TABLES `radcheck` WRITE;
 /*!40000 ALTER TABLE `radcheck` DISABLE KEYS */;
-INSERT INTO `radcheck` VALUES (59,'user1','Session-Timeout',':=','10'),(60,'user2','Session-Timeout',':=','10'),(61,'user3','Session-Timeout',':=','10'),(64,'user1','Auth-Type',':=','Reject'),(65,'user2','Auth-Type',':=','Reject'),(66,'user3','Auth-Type',':=','Reject');
+INSERT INTO `radcheck` VALUES (1,'areyumsvln','Cleartext-Password',':=','zptulgiknq'),(2,'areyumsvln','Session-Timeout',':=','10'),(3,'vcfwykuptz','Cleartext-Password',':=','hrcdxqskjm'),(4,'vcfwykuptz','Session-Timeout',':=','10');
 /*!40000 ALTER TABLE `radcheck` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -239,4 +239,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2013-10-25 14:12:51
+-- Dump completed on 2013-10-29 20:19:10

@@ -1,4 +1,8 @@
 #!/usr/bin/python
+##########################################################
+#   This unit test requires an unversioned qwifi.conf to #
+#   live in the same directory as DataBaseTest.py        #
+##########################################################
 import unittest
 import sys
 import os
@@ -7,10 +11,10 @@ import qwifi
 import MySQLdb
 from subprocess import call
 class DataBaseTest(unittest.TestCase):
-    #test that SetDbVar gets the correct values from config file
-    def test_DataBaseVar(self):
+    #test that parseConfigFile gets the correct values from config file
+    def test_ParseConfigFile(self):
         #load config file
-        qwifi.parseConfigFile("qwifi.conf")
+        qwifi.parseConfigFile("test.conf")
         #make sure the expected values were loaded
         self.assertEqual(qwifi.server, 'localhost')
         self.assertEqual(qwifi.user,'root')
