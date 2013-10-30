@@ -1,5 +1,7 @@
 *.py[cod]
 
+unit-test/qwifi.conf
+
 # C extensions
 *.so
 
