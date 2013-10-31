@@ -20,6 +20,10 @@ logLevels = ("NONE", "ERROR", "WARNING", "INFO", "DEBUG")  # to add a new mode w
 logLevels = namedtuple("logLevels", logLevels)(*range(len(logLevels)))
 logLevel = logLevels.WARNING
 
+accessModes = ("DEVICE", "AP")
+accessModes = namedtuple("accessModes", accessModes)(*range(len(accessModes)))
+accessMode = ""
+
 Config = ConfigParser.ConfigParser()
 
 # Helper function for ConfigParser
@@ -30,7 +34,7 @@ def config_section_map(section):
         try:
             dictionary[option] = Config.get(section, option)
             if dictionary[option] == -1:
-                print("skiping: %s" % option)
+                print("skipping: %s" % option)
         except:
             print("exception on %s!" % option)
             dictionary[option] = None
@@ -41,7 +45,6 @@ server = ""
 user = ""
 password = ""
 database = ""
-logging = ""
 
 # set global configuration variables from configuration file
 def parse_config_file(path):
@@ -50,6 +53,7 @@ def parse_config_file(path):
     global password
     global database
     global logLevel
+    global accessMode
 
     Config.read(path)
 
@@ -59,6 +63,7 @@ def parse_config_file(path):
         password = config_section_map("database")['password']
         database = config_section_map("database")['database']
         logLevel = logLevels._asdict()[config_section_map("logging")['level'].upper()]
+        accessMode = accessModes._asdict()[config_section_map("access")['mode'].upper()]
     except ConfigParser.NoSectionError:
         print "User Error", "File does NOT exist or file path NOT valid."
         sys.exit(1)
