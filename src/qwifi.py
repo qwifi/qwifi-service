@@ -20,9 +20,9 @@ logLevels = ("NONE", "ERROR", "WARNING", "INFO", "DEBUG")  # to add a new mode w
 logLevels = namedtuple("logLevels", logLevels)(*range(len(logLevels)))
 logLevel = logLevels.WARNING
 
-accessModes = ("DEVICE", "AP")
-accessModes = namedtuple("accessModes", accessModes)(*range(len(accessModes)))
-accessMode = ""
+sessionModes = ("DEVICE", "AP")
+sessionModes = namedtuple("sessionModes", sessionModes)(*range(len(sessionModes)))
+sessionMode = ""
 
 Config = ConfigParser.ConfigParser()
 
@@ -53,7 +53,7 @@ def parse_config_file(path):
     global password
     global database
     global logLevel
-    global accessMode
+    global sessionMode
 
     Config.read(path)
 
@@ -63,7 +63,7 @@ def parse_config_file(path):
         password = config_section_map("database")['password']
         database = config_section_map("database")['database']
         logLevel = logLevels._asdict()[config_section_map("logging")['level'].upper()]
-        accessMode = accessModes._asdict()[config_section_map("access")['mode'].upper()]
+        sessionMode = sessionModes._asdict()[config_section_map("session")['mode'].upper()]
     except ConfigParser.NoSectionError:
         print "User Error", "File does NOT exist or file path NOT valid."
         sys.exit(1)
@@ -84,7 +84,10 @@ def error(tag, e):
 
 def update_rad_check(dataBase, cursor):
     try:
-        cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
+        if sessionMode == sessionModes.DEVICE:
+            cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
+        else:
+            cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck WHERE radcheck.attribute='Vendor-Specific' AND radcheck.value - NOW() < 0;")
         if int(cursor.rowcount) > 0:
             log("update_rad_check", "we have updated radcheck", logLevels.DEBUG)
         dataBase.commit()
@@ -94,13 +97,17 @@ def update_rad_check(dataBase, cursor):
         sys.exit()
 
 def disassociate(cursor):
-    cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL;")
+    cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
     mac_addresses = set(cursor.fetchall())
     for macAddr in mac_addresses:
         log("dissassociate", "dropping %s" % macAddr, logLevels.DEBUG)
         threading.Thread(target=drop_connection(macAddr[0].replace('-', ':')))
 
 def cull(dataBase, cursor):
+    if sessionMode == sessionModes.AP:
+        cursor.execute("SELECT DISTINCT username FROM radcheck WHERE username LIKE 'qwifi%';")
+        if cursor.rowcount > 1 :
+            log("cull", "There was more than one user during AP mode", logLevels.ERROR)
     try:
         cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
         users_culled = cursor.fetchall()
