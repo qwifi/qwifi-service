@@ -179,6 +179,14 @@ if __name__ == '__main__':
             parse_config_file(args.c)
             main()
         else:
+            try:
+                test_premission = open("/var/run/qwifi45.pid", 'a')
+                test_premission.close()
+                os.remove("/var/run/qwifi45.pid")
+            except IOError:
+                log('main', 'qwifi.pid File not found or program running without admin permissions', logLevels.ERROR)
+                print "Please run qwifi as admin."
+                sys.exit()
             parse_config_file(args.c)
             with daemon.DaemonContext(working_directory='.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr):
                 main()
