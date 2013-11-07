@@ -10,6 +10,8 @@ from collections import namedtuple
 import subprocess
 import ConfigParser
 import argparse
+import random
+import string
 
 modes = ("DAEMON", "FOREGROUND")
 modes = namedtuple("mode", modes)(*range(len(modes)))
@@ -87,9 +89,24 @@ def update_rad_check(dataBase, cursor):
         if sessionMode == sessionModes.DEVICE:
             cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value;")
         else:
-            cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck WHERE radcheck.attribute='Vendor-Specific' AND radcheck.value - NOW() < 0;")
+            cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck WHERE radcheck.attribute='Vendor-Specific' AND STR_TO_DATE(radcheck.value, '%Y-%m-%d %H:%i:%s') < NOW();")
+
         if int(cursor.rowcount) > 0:
             log("update_rad_check", "we have updated radcheck", logLevels.DEBUG)
+
+            if sessionMode == sessionModes.AP:
+                log("update_rad_check", "Regenerating access code...", logLevels.INFO)
+
+                disassociate(cursor)
+
+                pwsize = 10
+                username = 'qwifi' + ''.join(random.sample(string.ascii_lowercase, pwsize))
+                password = ''.join(random.sample(string.ascii_lowercase, pwsize))
+                query = "INSERT INTO radcheck SET username='%(username)s',attribute='Cleartext-Password',op=':=',value='%(password)s';" % { 'username' : username, 'password' : password }
+                cursor.execute(query)
+                query = "INSERT INTO radcheck (username,attribute,op,value) VALUES ('%(username)s', 'Vendor-Specific', ':=', DATE_FORMAT(NOW() + INTERVAL %(timeout)s SECOND, '%%Y-%%m-%%d %%H:%%i:%%s'));" % { 'username' : username, 'timeout' : Config.get('session', 'timeout') }
+                cursor.execute(query)
+
         dataBase.commit()
     except MySQLdb.Error, e:
         error("update_rad_check", e)
@@ -104,15 +121,11 @@ def disassociate(cursor):
         threading.Thread(target=drop_connection(macAddr[0].replace('-', ':')))
 
 def cull(dataBase, cursor):
-    if sessionMode == sessionModes.AP:
-        cursor.execute("SELECT DISTINCT username FROM radcheck WHERE username LIKE 'qwifi%';")
-        if cursor.rowcount > 1 :
-            log("cull", "There was more than one user during AP mode", logLevels.ERROR)
     try:
         cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
         users_culled = cursor.fetchall()
         for user in users_culled:
-            log("cull", "Taking out %s user from radcheck." % user, logLevels.DEBUG)
+            log("cull", "Removing user %s from radcheck." % user, logLevels.DEBUG)
         cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
         if int(cursor.rowcount) > 0:
             log("cull", "We have deleted %s things from radcheck" % cursor.rowcount, logLevels.DEBUG)
@@ -158,7 +171,7 @@ def main():
             log("main", e, logLevels.ERROR)
             raise
 
-        #print "We have opened MySQLdb successfully!"
+        # print "We have opened MySQLdb successfully!"
 
         update_rad_check(db, cursor)  # update radcheck with reject for old sessions
         disassociate(cursor)  # kick off all of the old sessions
