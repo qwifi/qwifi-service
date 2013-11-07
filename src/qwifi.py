@@ -88,17 +88,23 @@ def update_rad_check(dataBase, cursor):
     try:
         if sessionMode == sessionModes.DEVICE:
             cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value;")
+            if int(cursor.rowcount) > 0:
+                log("update_rad_check", "we have updated radcheck", logLevels.DEBUG)
         else:
             cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck WHERE radcheck.attribute='Vendor-Specific' AND STR_TO_DATE(radcheck.value, '%Y-%m-%d %H:%i:%s') < NOW();")
 
-        if int(cursor.rowcount) > 0:
-            log("update_rad_check", "we have updated radcheck", logLevels.DEBUG)
-
-            if sessionMode == sessionModes.AP:
-                log("update_rad_check", "Regenerating access code...", logLevels.INFO)
-
+            regen = False
+            if int(cursor.rowcount) > 0:
+                log("update_rad_check", "Regenerating access code for AP mode...", logLevels.INFO)
                 disassociate(cursor)
+                regen = True
+            else:  # check for empty db
+                cursor.execute("SELECT * from radcheck where username LIKE 'qwifi%';")
+                if cursor.rowcount == 0:
+                    log("update_rad_check", "Generating access code for AP mode...", logLevels.INFO)
+                    regen = True
 
+            if regen:
                 pwsize = 10
                 username = 'qwifi' + ''.join(random.sample(string.ascii_lowercase, pwsize))
                 password = ''.join(random.sample(string.ascii_lowercase, pwsize))
