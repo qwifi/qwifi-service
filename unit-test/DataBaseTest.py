@@ -21,6 +21,7 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(qwifi.database, 'radius')
         self.assertEqual(qwifi.password, 'password')
         self.assertEqual(qwifi.logLevel, 4)
+	self.assertEqual(qwifi.sessionMode, 0)
     
     def test_DissasociateQuery(self):
         qwifi.parse_config_file("qwifi.conf")
