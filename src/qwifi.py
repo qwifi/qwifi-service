@@ -72,7 +72,7 @@ def parse_config_file(path):
         sys.exit(1)
 
 def drop_connection(macAddr):
-    drop_return = subprocess.call(["sudo", "hostapd_cli", "disassociate", macAddr])
+    drop_return = subprocess.call(["hostapd_cli", "disassociate", macAddr])
 
     if drop_return == 0:  # We dropped the connection successfully
         log("drop_connection", "Mac Address %s is being dropped." % macAddr, logLevels.DEBUG)
