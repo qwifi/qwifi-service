@@ -27,7 +27,7 @@ sessionModes = namedtuple("sessionModes", sessionModes)(*range(len(sessionModes)
 sessionMode = ""
 
 Config = ConfigParser.ConfigParser()
-
+config_time_stamp = ""
 # Helper function for ConfigParser
 def config_section_map(section):
     dictionary = {}
@@ -56,7 +56,8 @@ def parse_config_file(path):
     global database
     global logLevel
     global sessionMode
-
+    global config_time_stamp
+    config_time_stamp = os.path.getmtime(path)
     Config.read(path)
 
     try:
@@ -163,8 +164,10 @@ def main():
     global database
 
     log('main', 'Started logging process on daemon', logLevels.DEBUG)
-
     while True:
+        new_config_time_stamp = os.path.getmtime(args.c)
+        if config_time_stamp != new_config_time_stamp:
+            parse_config_file(args.c)
         try:
             db = MySQLdb.connect(server, user, password, database)
         except MySQLdb.Error, e:
