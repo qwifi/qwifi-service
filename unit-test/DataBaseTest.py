@@ -1,8 +1,7 @@
 #!/usr/bin/python
-##########################################################
 #   This unit test requires an unversioned qwifi.conf to #
 #   live in the same directory as DataBaseTest.py        #
-##########################################################
+
 import unittest
 import sys
 import os
@@ -12,7 +11,7 @@ import MySQLdb
 from subprocess import call
 class DataBaseTest(unittest.TestCase):
     #test that parseConfigFile gets the correct values from config file
-    def test_ParseConfigFile(self):
+    def test_parse_config_file(self):
         #load config file
         qwifi.parse_config_file("test.conf")
         #make sure the expected values were loaded
@@ -21,8 +20,9 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(qwifi.database, 'radius')
         self.assertEqual(qwifi.password, 'password')
         self.assertEqual(qwifi.logLevel, 4)
+	self.assertEqual(qwifi.sessionMode, 0)
     
-    def test_DissasociateQuery(self):
+    def test_disassociate_query(self):
         qwifi.parse_config_file("qwifi.conf")
         #backup current radius database
         os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
@@ -44,7 +44,7 @@ class DataBaseTest(unittest.TestCase):
         db.close()
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
 
-    def test_Cull(self):
+    def test_cull(self):
         qwifi.parse_config_file("qwifi.conf")
         os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
@@ -67,12 +67,12 @@ class DataBaseTest(unittest.TestCase):
 
 
     #test for graceful exception handling if mysql is off
-    def test_DbConnectException(self):
+    def test_db_connect_exception(self):
        call(["sudo", "service", "mysql", "stop"])
        self.assertRaises(MySQLdb.Error, qwifi.main)
        call(["sudo", "service", "mysql", "start"])
 
-    def test_RadiusExists(self):
+    def test_radius_exists(self):
         qwifi.parse_config_file("qwifi.conf")
         db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
         cursor = db.cursor()
@@ -81,7 +81,7 @@ class DataBaseTest(unittest.TestCase):
         #if len of rad = 1 there is exactly one database named radius
         self.assertEqual(len(rad),1)
 
-    def test_TablesExist(self):
+    def test_tables_exist(self):
         qwifi.parse_config_file("qwifi.conf")
         db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
         cursor = db.cursor()
@@ -101,7 +101,7 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SHOW TABLES LIKE 'radusergroup'")
         self.assertEqual(len(cursor.fetchall()),1)
 
-    def test_UpdateRadcheck(self):
+    def test_update_rad_check(self):
         qwifi.parse_config_file("qwifi.conf")
         os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
