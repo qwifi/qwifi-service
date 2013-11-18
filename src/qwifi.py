@@ -120,12 +120,21 @@ def update_rad_check(dataBase, cursor):
         dataBase.rollback()
         sys.exit()
 
+def freeloader_gen(duplicates):
+    previous = ()
+    for entry in duplicates:
+        if entry[0] == previous:
+            yield entry[1]
+        previous = entry[0]
+
 def disassociate(cursor):
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
-    mac_addresses = set(cursor.fetchall())
+    mac_addresses = list(cursor.fetchall())
+    cursor.execute("select username,callingstationid, UNIX_TIMESTAMP(acctstarttime) as DATE from radacct GROUP BY username,callingstationid ORDER BY DATE ASC;")
+    mac_addresses = set(mac_addresses + [fl for fl in freeloader_gen(cursor.fetchall())])
     for macAddr in mac_addresses:
         log("dissassociate", "dropping %s" % macAddr, logLevels.DEBUG)
-        threading.Thread(target=drop_connection(macAddr[0].replace('-', ':')))
+        threading.Thread(target=drop_connection(macAddr.replace('-', ':')))
 
 def cull(dataBase, cursor):
     try:
@@ -175,7 +184,7 @@ def main():
             raise
         try:
             cursor = db.cursor()
-        except e:
+        except MySQLdb.Error, e:
             print "blah."
             log("main", e, logLevels.ERROR)
             raise
