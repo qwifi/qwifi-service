@@ -120,6 +120,8 @@ def update_rad_check(dataBase, cursor):
         dataBase.rollback()
         sys.exit()
 
+# Generate a list of freeloader connections (skips the first connection,
+# which is assumed to be valid)
 def freeloader_gen(duplicates):
     previous = ()
     for entry in duplicates:
@@ -129,12 +131,12 @@ def freeloader_gen(duplicates):
 
 def disassociate(cursor):
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
-    mac_addresses = list(cursor.fetchall())
+    mac_addresses = [result[0] for result in cursor.fetchall()]
     cursor.execute("select username,callingstationid, UNIX_TIMESTAMP(acctstarttime) as DATE from radacct GROUP BY username,callingstationid ORDER BY DATE ASC;")
     mac_addresses = set(mac_addresses + [fl for fl in freeloader_gen(cursor.fetchall())])
-    for macAddr in mac_addresses:
-        log("dissassociate", "dropping %s" % macAddr, logLevels.DEBUG)
-        threading.Thread(target=drop_connection(macAddr.replace('-', ':')))
+    for mac_address in mac_addresses:
+        log("disassociate", "dropping %s" % mac_address, logLevels.DEBUG)
+        threading.Thread(target=drop_connection(mac_address.replace('-', ':')))
 
 def cull(dataBase, cursor):
     try:
