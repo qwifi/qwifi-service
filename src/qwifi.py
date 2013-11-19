@@ -75,9 +75,9 @@ def drop_connection(macAddr):
     drop_return = subprocess.call(["hostapd_cli", "disassociate", macAddr])
 
     if drop_return == 0:  # We dropped the connection successfully
-        log("drop_connection", "Mac Address %s is being dropped." % macAddr, logLevels.DEBUG)
+        log("drop_connection", "MAC Address %s is being dropped." % macAddr, logLevels.DEBUG)
     else:
-        log("drop_connection", "An error occured while dropping the Mac Address of: %s" % macAddr, logLevels.ERROR)
+        log("drop_connection", "An error occured while dropping the MAC Address of: %s" % macAddr, logLevels.ERROR)
 
 def error(tag, e):
     try:
