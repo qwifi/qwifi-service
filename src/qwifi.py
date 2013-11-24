@@ -132,8 +132,9 @@ def freeloader_gen(duplicates):
 def disassociate(cursor):
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
     mac_addresses = [result[0] for result in cursor.fetchall()]
-    cursor.execute("select username,callingstationid, UNIX_TIMESTAMP(acctstarttime) as DATE from radacct GROUP BY username,callingstationid ORDER BY DATE ASC;")
-    mac_addresses = set(mac_addresses + [fl for fl in freeloader_gen(cursor.fetchall())])
+    cursor.execute("select username,callingstationid, UNIX_TIMESTAMP(acctstarttime) as DATE from radacct WHERE acctstoptime is NULL GROUP BY username,callingstationid ORDER BY DATE ASC;")
+    if sessionMode == sessionModes.DEVICE:
+        mac_addresses = set(mac_addresses + [fl for fl in freeloader_gen(cursor.fetchall())])
     for mac_address in mac_addresses:
         log("disassociate", "dropping %s" % mac_address, logLevels.DEBUG)
         threading.Thread(target=drop_connection(mac_address.replace('-', ':')))
@@ -212,7 +213,7 @@ if __name__ == '__main__':
             parse_config_file(args.c)
             main()
         else:
-            if os.geteuid()!=0:
+            if os.geteuid() != 0:
                 log('main', 'qwifi.pid File not found or program running without admin permissions', logLevels.ERROR)
                 print "Please run qwifi as admin."
                 sys.exit()
