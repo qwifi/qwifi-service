@@ -1,0 +1,58 @@
+#!/usr/bin/python
+import unittest
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
+import qwifi
+
+class LogTest(unittest.TestCase):
+
+        def test_log_debug(self):
+            qwifi.log_level = qwifi.log_levels.DEBUG
+            qwifi.log("DEBUG", "level=DEBUG", qwifi.log_levels.DEBUG)
+            f = open("/var/log/syslog")
+            lines = f.readlines()
+            self.assertEqual(lines[-1][-19:-1], "[DEBUG]level=DEBUG")
+            f.close()
+
+        def test_log_error(self):
+            qwifi.log_level = qwifi.log_levels.DEBUG
+            qwifi.log("ERROR", "level=ERROR", qwifi.log_levels.DEBUG)
+            f = open("/var/log/syslog")
+            lines = f.readlines()
+            self.assertEqual(lines[-1][-19:-1], "[ERROR]level=ERROR")
+            f.close()
+
+        def test_log_greater(self):
+            qwifi.log_level = qwifi.log_levels.ERROR
+            qwifi.log("greater", "level=DEBUG log_level=ERROR", qwifi.log_levels.DEBUG)
+            f = open("/var/log/syslog")
+            lines = f.readlines()
+            f.close()
+            self.assertEqual(lines[-1][-43:-1], "[INVALID] Tried to log with invalid level.")
+
+        def test_log_info(self):
+            qwifi.log_level = qwifi.log_levels.DEBUG
+            qwifi.log("info", "level=info", qwifi.log_levels.INFO)
+            f = open("/var/log/syslog")
+            lines = f.readlines()
+            self.assertEqual(lines[-1][-17:-1], "[info]level=info")
+            f.close()
+
+        def test_log_none(self):
+            qwifi.log("none", "level=none", qwifi.log_levels.NONE)
+            f = open("/var/log/syslog")
+            lines = f.readlines()
+            self.assertEqual(lines[-1][-43:-1], "[INVALID] Tried to log with invalid level.")
+            f.close()
+
+        def test_log_warning(self):
+            qwifi.log_level = qwifi.log_levels.DEBUG
+            qwifi.log("WARNING", "level=WARNING", qwifi.log_levels.DEBUG)
+            f = open("/var/log/syslog")
+            lines = f.readlines()
+            self.assertEqual(lines[-1][-23:-1], "[WARNING]level=WARNING")
+            f.close()
+
+
+if __name__ == '__main__':
+    unittest.main()
