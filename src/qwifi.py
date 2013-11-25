@@ -176,9 +176,6 @@ def main():
 
     log('main', 'Started logging process on daemon', logLevels.DEBUG)
     while True:
-        new_config_time_stamp = os.path.getmtime(args.c)
-        if config_time_stamp != new_config_time_stamp:
-            parse_config_file(args.c)
         try:
             db = MySQLdb.connect(server, user, password, database)
         except MySQLdb.Error, e:
@@ -192,6 +189,17 @@ def main():
             raise
 
         # print "We have opened MySQLdb successfully!"
+        new_config_time_stamp = os.path.getmtime(args.c)
+        if config_time_stamp != new_config_time_stamp:
+            parse_config_file(args.c)
+            if sessionMode == sessionModes.AP:
+                try:
+                    cursor.execute("DELETE FROM radcheck WHERE username LIKE 'qwifi%';")
+                    db.commit()
+                except MySQLdb.Error, e:
+                    error("main", e)
+                    db.rollback()
+                    raise
 
         update_rad_check(db, cursor)  # update radcheck with reject for old sessions
         disassociate(cursor)  # kick off all of the old sessions
