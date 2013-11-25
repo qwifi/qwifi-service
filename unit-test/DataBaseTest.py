@@ -19,8 +19,8 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(qwifi.user,'root')
         self.assertEqual(qwifi.database, 'radius')
         self.assertEqual(qwifi.password, 'password')
-        self.assertEqual(qwifi.logLevel, 4)
-	self.assertEqual(qwifi.sessionMode, 0)
+        self.assertEqual(qwifi.log_level, 4)
+        self.assertEqual(qwifi.session_mode, 0)
     
     def test_disassociate_query(self):
         qwifi.parse_config_file("qwifi.conf")
@@ -101,14 +101,14 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SHOW TABLES LIKE 'radusergroup'")
         self.assertEqual(len(cursor.fetchall()),1)
 
-    def test_update_rad_check(self):
+    def test_update_radcheck(self):
         qwifi.parse_config_file("qwifi.conf")
         os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
         db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
         cursor = db.cursor()
         #let updateRadcheck do it's job
-        qwifi.update_rad_check(db, cursor)
+        qwifi.update_radcheck(db, cursor)
         #three new entries should be added to radcheck 3 (original) + 3 (new) == 6 entries
         cursor.execute("SELECT * from radcheck;")
         self.assertEqual(len(cursor.fetchall()), 6)

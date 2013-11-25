@@ -17,14 +17,14 @@ modes = ("DAEMON", "FOREGROUND")
 modes = namedtuple("mode", modes)(*range(len(modes)))
 mode = modes.DAEMON
 
-logLevels = ("NONE", "ERROR", "WARNING", "INFO", "DEBUG")  # to add a new mode we just need another tuple entry
+log_levels = ("NONE", "ERROR", "WARNING", "INFO", "DEBUG")  # to add a new mode we just need another tuple entry
 # create class logLevels with attributes that are members of logLevels tuple
-logLevels = namedtuple("logLevels", logLevels)(*range(len(logLevels)))
-logLevel = logLevels.WARNING
+log_levels = namedtuple("logLevels", log_levels)(*range(len(log_levels)))
+log_level = log_levels.WARNING
 
-sessionModes = ("DEVICE", "AP")
-sessionModes = namedtuple("sessionModes", sessionModes)(*range(len(sessionModes)))
-sessionMode = ""
+session_modes = ("DEVICE", "AP")
+session_modes = namedtuple("sessionModes", session_modes)(*range(len(session_modes)))
+session_mode = ""
 
 Config = ConfigParser.ConfigParser()
 config_time_stamp = ""
@@ -54,8 +54,8 @@ def parse_config_file(path):
     global user
     global password
     global database
-    global logLevel
-    global sessionMode
+    global log_level
+    global session_mode
     global config_time_stamp
     config_time_stamp = os.path.getmtime(path)
     Config.read(path)
@@ -65,8 +65,8 @@ def parse_config_file(path):
         user = config_section_map("database")['username']
         password = config_section_map("database")['password']
         database = config_section_map("database")['database']
-        logLevel = logLevels._asdict()[config_section_map("logging")['level'].upper()]
-        sessionMode = sessionModes._asdict()[config_section_map("session")['mode'].upper()]
+        log_level = log_levels._asdict()[config_section_map("logging")['level'].upper()]
+        session_mode = session_modes._asdict()[config_section_map("session")['mode'].upper()]
     except ConfigParser.NoSectionError:
         print "User Error", "File does NOT exist or file path NOT valid."
         sys.exit(1)
@@ -75,34 +75,34 @@ def drop_connection(macAddr):
     drop_return = subprocess.call(["hostapd_cli", "disassociate", macAddr])
 
     if drop_return == 0:  # We dropped the connection successfully
-        log("drop_connection", "MAC Address %s is being dropped." % macAddr, logLevels.DEBUG)
+        log("drop_connection", "MAC Address %s is being dropped." % macAddr, log_levels.DEBUG)
     else:
-        log("drop_connection", "An error occured while dropping the MAC Address of: %s" % macAddr, logLevels.ERROR)
+        log("drop_connection", "An error occured while dropping the MAC Address of: %s" % macAddr, log_levels.ERROR)
 
-def error(tag, e):
+def db_error(tag, e):
     try:
-        log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), logLevels.ERROR)
+        log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), log_levels.ERROR)
     except IndexError:
-        log(tag, "MySQL Error: %s" % str(e), logLevels.ERROR)
+        log(tag, "MySQL Error: %s" % str(e), log_levels.ERROR)
 
-def update_rad_check(dataBase, cursor):
+def update_radcheck(dataBase, cursor):
     try:
-        if sessionMode == sessionModes.DEVICE:
+        if session_mode == session_modes.DEVICE:
             cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value;")
             if int(cursor.rowcount) > 0:
-                log("update_rad_check", "we have updated radcheck", logLevels.DEBUG)
+                log("update_rad_check", "we have updated radcheck", log_levels.DEBUG)
         else:
             cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck WHERE radcheck.attribute='Vendor-Specific' AND STR_TO_DATE(radcheck.value, '%Y-%m-%d %H:%i:%s') < STR_TO_DATE(UTC_TIMESTAMP(), '%Y-%m-%d %H:%i:%s');")
 
             regen = False
             if int(cursor.rowcount) > 0:
-                log("update_rad_check", "Regenerating access code for AP mode...", logLevels.INFO)
+                log("update_rad_check", "Regenerating access code for AP mode...", log_levels.INFO)
                 disassociate(cursor)
                 regen = True
             else:  # check for empty db
                 cursor.execute("SELECT * from radcheck where username LIKE 'qwifi%';")
                 if cursor.rowcount == 0:
-                    log("update_rad_check", "Generating access code for AP mode...", logLevels.INFO)
+                    log("update_rad_check", "Generating access code for AP mode...", log_levels.INFO)
                     regen = True
 
             if regen:
@@ -116,7 +116,7 @@ def update_rad_check(dataBase, cursor):
 
         dataBase.commit()
     except MySQLdb.Error, e:
-        error("update_rad_check", e)
+        db_error("update_rad_check", e)
         dataBase.rollback()
         sys.exit()
 
@@ -133,10 +133,10 @@ def disassociate(cursor):
     cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
     mac_addresses = [result[0] for result in cursor.fetchall()]
     cursor.execute("select username,callingstationid, UNIX_TIMESTAMP(acctstarttime) as DATE from radacct WHERE acctstoptime is NULL GROUP BY username,callingstationid ORDER BY DATE ASC;")
-    if sessionMode == sessionModes.DEVICE:
+    if session_mode == session_modes.DEVICE:
         mac_addresses = set(mac_addresses + [fl for fl in freeloader_gen(cursor.fetchall())])
     for mac_address in mac_addresses:
-        log("disassociate", "dropping %s" % mac_address, logLevels.DEBUG)
+        log("disassociate", "dropping %s" % mac_address, log_levels.DEBUG)
         threading.Thread(target=drop_connection(mac_address.replace('-', ':')))
 
 def cull(dataBase, cursor):
@@ -144,27 +144,27 @@ def cull(dataBase, cursor):
         cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
         users_culled = cursor.fetchall()
         for user in users_culled:
-            log("cull", "Removing user %s from radcheck." % user, logLevels.DEBUG)
+            log("cull", "Removing user %s from radcheck." % user, log_levels.DEBUG)
         cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
         if int(cursor.rowcount) > 0:
-            log("cull", "We have deleted %s things from radcheck" % cursor.rowcount, logLevels.DEBUG)
+            log("cull", "We have deleted %s things from radcheck" % cursor.rowcount, log_levels.DEBUG)
         dataBase.commit()
     except MySQLdb.Error, e:
-        error("cull", e)
+        db_error("cull", e)
         dataBase.rollback()
 
 # A general log function, the modes are normal, Error, Warning, Debug
 def log(tag, message, level):
     if mode == modes.FOREGROUND:
         print "[" + tag + "]" + message
-    if level != logLevels.NONE and level <= logLevel:
-        if level == logLevels.ERROR:
+    if level != log_levels.NONE and level <= log_level:
+        if level == log_levels.ERROR:
             syslog.syslog(syslog.LOG_ERR, "[" + tag + "]" + message)
-        elif level == logLevels.WARNING:
+        elif level == log_levels.WARNING:
             syslog.syslog(syslog.LOG_WARNING, "[" + tag + "]" + message)
-        elif level == logLevels.INFO:
+        elif level == log_levels.INFO:
             syslog.syslog(syslog.LOG_INFO, "[" + tag + "]" + message)
-        elif level == logLevels.DEBUG:
+        elif level == log_levels.DEBUG:
             syslog.syslog(syslog.LOG_DEBUG, "[" + tag + "]" + message)
         else:
             syslog.syslog("[UNKNOWN MODE]" + message)
@@ -175,34 +175,34 @@ def main():
     global password
     global database
 
-    log('main', 'Started logging process on daemon', logLevels.DEBUG)
+    log('main', 'Started logging process on daemon', log_levels.DEBUG)
     while True:
         try:
             db = MySQLdb.connect(server, user, password, database)
         except MySQLdb.Error, e:
-            error("main", e)
+            db_error("main", e)
             raise
         try:
             cursor = db.cursor()
         except MySQLdb.Error, e:
             print "blah."
-            log("main", e, logLevels.ERROR)
+            log("main", e, log_levels.ERROR)
             raise
 
         # print "We have opened MySQLdb successfully!"
         new_config_time_stamp = os.path.getmtime(args.c)
         if config_time_stamp != new_config_time_stamp:
             parse_config_file(args.c)
-            if sessionMode == sessionModes.AP:
+            if session_mode == session_modes.AP:
                 try:
                     cursor.execute("DELETE FROM radcheck WHERE username LIKE 'qwifi%';")
                     db.commit()
                 except MySQLdb.Error, e:
-                    error("main", e)
+                    db_error("main", e)
                     db.rollback()
                     raise
 
-        update_rad_check(db, cursor)  # update radcheck with reject for old sessions
+        update_radcheck(db, cursor)  # update radcheck with reject for old sessions
         disassociate(cursor)  # kick off all of the old sessions
         cull(db, cursor)  # remove unneccassery data from DB
         time.sleep(5)  # loop every 5 seconds
@@ -217,12 +217,12 @@ if __name__ == '__main__':
     if not os.path.exists("/var/run/qwifi.pid.lock"):
         if args.n == True:
             mode = modes.FOREGROUND
-            logLevel = logLevels.DEBUG
+            log_level = log_levels.DEBUG
             parse_config_file(args.c)
             main()
         else:
             if os.geteuid() != 0:
-                log('main', 'qwifi.pid File not found or program running without admin permissions', logLevels.ERROR)
+                log('main', 'qwifi.pid File not found or program running without admin permissions', log_levels.ERROR)
                 print "Please run qwifi as admin."
                 sys.exit()
             parse_config_file(args.c)
