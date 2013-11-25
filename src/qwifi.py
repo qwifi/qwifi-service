@@ -180,6 +180,8 @@ def log(tag, message, level):
             syslog.syslog(syslog.LOG_DEBUG, "[" + tag + "]" + message)
         else:
             syslog.syslog("[UNKNOWN MODE]" + message)
+    else:
+            syslog.syslog("[INVALID] Tried to log with invalid level.")
 
 
 def main():
