@@ -1,0 +1,25 @@
+#!/bin/bash
+if [ $# = 1 ]
+then
+    if [ $1 = 'all' -a "$(id -u)" = "0" ]
+    then
+        python -m unittest discover
+    elif [ $1 = 'log' ]
+    then
+        ./testLog.py
+    elif [ $1 = 'db' ]
+    then
+        ./testDataBase.py
+    elif [ $1 = 'util' ]
+    then
+        ./testUtil.py
+    fi
+else
+    if [ "$(id -u)" != "0" ]; then
+	    echo "Sorry, you are not root."
+    fi
+    echo "sudo ./test all   -----> run all unit tests"
+    echo "sudo ./test log   -----> run log unit tests"
+    echo "sudo ./test db    -----> run db unit tests"
+    echo "sudo ./test util  -----> run util unit tests"
+fi
