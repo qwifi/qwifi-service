@@ -71,6 +71,7 @@ def parse_config_file(path):
         print "User Error", "File does NOT exist or file path NOT valid."
         sys.exit(1)
 
+
 def drop_connection(macAddr):
     drop_return = subprocess.call(["hostapd_cli", "disassociate", macAddr])
 
@@ -79,20 +80,24 @@ def drop_connection(macAddr):
     else:
         log("drop_connection", "An error occured while dropping the MAC Address of: %s" % macAddr, log_levels.ERROR)
 
+
 def db_error(tag, e):
     try:
         log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), log_levels.ERROR)
     except IndexError:
         log(tag, "MySQL Error: %s" % str(e), log_levels.ERROR)
 
+
 def update_radcheck(dataBase, cursor):
     try:
         if session_mode == session_modes.DEVICE:
-            cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value;")
+            cursor.execute(
+                "INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value;")
             if int(cursor.rowcount) > 0:
                 log("update_rad_check", "we have updated radcheck", log_levels.DEBUG)
         else:
-            cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck WHERE radcheck.attribute='Vendor-Specific' AND STR_TO_DATE(radcheck.value, '%Y-%m-%d %H:%i:%s') < STR_TO_DATE(UTC_TIMESTAMP(), '%Y-%m-%d %H:%i:%s');")
+            cursor.execute(
+                "INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck WHERE radcheck.attribute='Vendor-Specific' AND STR_TO_DATE(radcheck.value, '%Y-%m-%d %H:%i:%s') < STR_TO_DATE(UTC_TIMESTAMP(), '%Y-%m-%d %H:%i:%s');")
 
             regen = False
             if int(cursor.rowcount) > 0:
@@ -109,9 +114,11 @@ def update_radcheck(dataBase, cursor):
                 pwsize = 10
                 username = 'qwifi' + ''.join(random.sample(string.ascii_lowercase, pwsize))
                 password = ''.join(random.sample(string.ascii_lowercase, pwsize))
-                query = "INSERT INTO radcheck SET username='%(username)s',attribute='Cleartext-Password',op=':=',value='%(password)s';" % { 'username' : username, 'password' : password }
+                query = "INSERT INTO radcheck SET username='%(username)s',attribute='Cleartext-Password',op=':=',value='%(password)s';" % {
+                    'username': username, 'password': password}
                 cursor.execute(query)
-                query = "INSERT INTO radcheck (username,attribute,op,value) VALUES ('%(username)s', 'Vendor-Specific', ':=', DATE_FORMAT(UTC_TIMESTAMP() + INTERVAL %(timeout)s SECOND, '%%Y-%%m-%%d %%H:%%i:%%s'));" % { 'username' : username, 'timeout' : Config.get('session', 'timeout') }
+                query = "INSERT INTO radcheck (username,attribute,op,value) VALUES ('%(username)s', 'Vendor-Specific', ':=', DATE_FORMAT(UTC_TIMESTAMP() + INTERVAL %(timeout)s SECOND, '%%Y-%%m-%%d %%H:%%i:%%s'));" % {
+                    'username': username, 'timeout': Config.get('session', 'timeout')}
                 cursor.execute(query)
 
         dataBase.commit()
@@ -129,15 +136,19 @@ def freeloader_gen(duplicates):
             yield entry[1]
         previous = entry[0]
 
+
 def disassociate(cursor):
-    cursor.execute("SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
+    cursor.execute(
+        "SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
     mac_addresses = [result[0] for result in cursor.fetchall()]
-    cursor.execute("select username,callingstationid, UNIX_TIMESTAMP(acctstarttime) as DATE from radacct WHERE acctstoptime is NULL GROUP BY username,callingstationid ORDER BY DATE ASC;")
+    cursor.execute(
+        "select username,callingstationid, UNIX_TIMESTAMP(acctstarttime) as DATE from radacct WHERE acctstoptime is NULL GROUP BY username,callingstationid ORDER BY DATE ASC;")
     if session_mode == session_modes.DEVICE:
         mac_addresses = set(mac_addresses + [fl for fl in freeloader_gen(cursor.fetchall())])
     for mac_address in mac_addresses:
         log("disassociate", "dropping %s" % mac_address, log_levels.DEBUG)
         threading.Thread(target=drop_connection(mac_address.replace('-', ':')))
+
 
 def cull(dataBase, cursor):
     try:
@@ -145,7 +156,8 @@ def cull(dataBase, cursor):
         users_culled = cursor.fetchall()
         for user in users_culled:
             log("cull", "Removing user %s from radcheck." % user, log_levels.DEBUG)
-        cursor.execute("DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
+        cursor.execute(
+            "DELETE FROM radcheck WHERE username IN (SELECT username FROM (SELECT username FROM radcheck WHERE value='Reject') temp);")
         if int(cursor.rowcount) > 0:
             log("cull", "We have deleted %s things from radcheck" % cursor.rowcount, log_levels.DEBUG)
         dataBase.commit()
@@ -168,6 +180,7 @@ def log(tag, message, level):
             syslog.syslog(syslog.LOG_DEBUG, "[" + tag + "]" + message)
         else:
             syslog.syslog("[UNKNOWN MODE]" + message)
+
 
 def main():
     global server
@@ -208,12 +221,16 @@ def main():
         time.sleep(5)  # loop every 5 seconds
 
 # parsing through the command line arguments.
-parser = argparse.ArgumentParser()
-parser.add_argument("-n", action="store_true", help="Displays messages to the foreground(stdout) or syslog.")
-parser.add_argument("-c", default="qwifi.conf", help="allows you to designate where qwifi.conf is located.")
-args = parser.parse_args()
+def parse_args():
+    global args
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", action="store_true", help="Displays messages to the foreground(stdout) or syslog.")
+    parser.add_argument("-c", default="qwifi.conf", help="allows you to designate where qwifi.conf is located.")
+    return parser.parse_args()
+
 
 if __name__ == '__main__':
+    args = parse_args()
     if not os.path.exists("/var/run/qwifi.pid.lock"):
         if args.n == True:
             mode = modes.FOREGROUND
@@ -226,7 +243,8 @@ if __name__ == '__main__':
                 print "Please run qwifi as admin."
                 sys.exit()
             parse_config_file(args.c)
-            with daemon.DaemonContext(working_directory='.', pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr):
+            with daemon.DaemonContext(working_directory='.',
+                                      pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr):
                 main()
     else:
         print "Service is already running."
