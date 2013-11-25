@@ -11,6 +11,8 @@ class LogTest(unittest.TestCase):
             qwifi.log("DEBUG", "level=DEBUG", qwifi.log_levels.DEBUG)
             f = open("/var/log/syslog")
             lines = f.readlines()
+            # this 'weird' indexing is because the beginning of each line is a timestamp + the device name
+            # the only way I could get only the message was to index from the back of the line.
             self.assertEqual(lines[-1][-19:-1], "[DEBUG]level=DEBUG")
             f.close()
 
@@ -43,6 +45,13 @@ class LogTest(unittest.TestCase):
             f = open("/var/log/syslog")
             lines = f.readlines()
             self.assertEqual(lines[-1][-43:-1], "[INVALID] Tried to log with invalid level.")
+            f.close()
+
+        def test_log_unknown(self):
+            qwifi.log("UNKNOWN", "level=UNKNOWN", -1)
+            f = open("/var/log/syslog")
+            lines = f.readlines()
+            self.assertEqual(lines[-1][-28:-1], "[UNKNOWN MODE]level=UNKNOWN")
             f.close()
 
         def test_log_warning(self):
