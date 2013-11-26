@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import unittest
-import sys, os
+import sys, os, ConfigParser
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
 import qwifi
@@ -32,7 +32,13 @@ class UtilTest(unittest.TestCase):
         args = qwifi.parse_args()
         self.assertEqual("Namespace(c='test', n=True)", str(args))
 
+    def test_config_section_map_exception(self):
+        with self.assertRaises(ConfigParser.NoSectionError):
+            qwifi.config_section_map("derp")
 
+    def test_parse_config_file_exception(self):
+        with self.assertRaises(ConfigParser.NoSectionError):
+            qwifi.parse_config_file('bad.conf')
 
 if __name__ == '__main__':
     unittest.main()
