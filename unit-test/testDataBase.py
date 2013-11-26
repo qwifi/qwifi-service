@@ -74,6 +74,7 @@ class DataBaseTest(unittest.TestCase):
        self.assertRaises(MySQLdb.Error, qwifi.main)
        with self.assertRaises(MySQLdb.OperationalError):
            qwifi.update_radcheck(db, cursor)
+       with self.assertRaises(MySQLdb.Error):
            qwifi.cull(db, cursor)
        call(["sudo", "service", "mysql", "start"])
 
