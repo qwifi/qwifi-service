@@ -68,8 +68,13 @@ class DataBaseTest(unittest.TestCase):
 
     #test for graceful exception handling if mysql is off
     def test_db_connect_exception(self):
+       db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
+       cursor = db.cursor()
        call(["sudo", "service", "mysql", "stop"])
        self.assertRaises(MySQLdb.Error, qwifi.main)
+       with self.assertRaises(MySQLdb.OperationalError):
+           qwifi.update_radcheck(db, cursor)
+           qwifi.cull(db, cursor)
        call(["sudo", "service", "mysql", "start"])
 
     def test_radius_exists(self):
