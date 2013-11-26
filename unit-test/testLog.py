@@ -1,8 +1,10 @@
 #!/usr/bin/python
 import unittest
 import sys, os
+from cStringIO import StringIO
 sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
 import qwifi
+
 
 class LogTest(unittest.TestCase):
 
@@ -61,6 +63,16 @@ class LogTest(unittest.TestCase):
             lines = f.readlines()
             self.assertEqual(lines[-1][-23:-1], "[WARNING]level=WARNING")
             f.close()
+
+        def test_log_foreground(self):
+            real_stdout = sys.stdout
+            sys.stdout = myout = StringIO()
+            qwifi.log_level = qwifi.log_levels.DEBUG
+            qwifi.mode = qwifi.modes.FOREGROUND
+            qwifi.log("FG", "level=DEBUG", qwifi.log_levels.DEBUG)
+            sys.stdout = real_stdout
+            self._baseAssertEqual(myout.getvalue(), "[FG]level=DEBUG\n")
+
 
 
 if __name__ == '__main__':
