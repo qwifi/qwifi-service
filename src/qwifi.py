@@ -69,7 +69,7 @@ def parse_config_file(path):
         session_mode = session_modes._asdict()[config_section_map("session")['mode'].upper()]
     except ConfigParser.NoSectionError:
         print "User Error", "File does NOT exist or file path NOT valid."
-        sys.exit(1)
+        raise
 
 
 def drop_connection(macAddr):
@@ -82,10 +82,8 @@ def drop_connection(macAddr):
 
 
 def db_error(tag, e):
-    try:
-        log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), log_levels.ERROR)
-    except IndexError:
-        log(tag, "MySQL Error: %s" % str(e), log_levels.ERROR)
+    log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), log_levels.ERROR)
+
 
 
 def update_radcheck(dataBase, cursor):
