@@ -58,7 +58,7 @@ class LogTest(unittest.TestCase):
 
         def test_log_warning(self):
             qwifi.log_level = qwifi.log_levels.DEBUG
-            qwifi.log("WARNING", "level=WARNING", qwifi.log_levels.DEBUG)
+            qwifi.log("WARNING", "level=WARNING", qwifi.log_levels.WARNING)
             f = open("/var/log/syslog")
             lines = f.readlines()
             self.assertEqual(lines[-1][-23:-1], "[WARNING]level=WARNING")
