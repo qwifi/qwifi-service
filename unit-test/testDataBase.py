@@ -125,7 +125,7 @@ class DataBaseTest(unittest.TestCase):
         cursor = db.cursor()
         #let updateRadcheck do it's job
         qwifi.update_radcheck(db, cursor)
-        #three new entries should be added to radcheck 6 (original) + 3 (reject) + 2 (regen) == 11 entries
+        #five new entries should be added to radcheck 6 (original) + 3 (reject) + 2 (regen) == 11 entries
         cursor.execute("SELECT * from radcheck;")
         self.assertEqual(len(cursor.fetchall()), 11)
         db.close()
