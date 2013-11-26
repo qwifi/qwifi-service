@@ -133,6 +133,10 @@ class DataBaseTest(unittest.TestCase):
         #five new entries should be added to radcheck 6 (original) + 3 (reject) + 2 (regen) == 11 entries
         cursor.execute("SELECT * from radcheck;")
         self.assertEqual(len(cursor.fetchall()), 11)
+        cursor.execute("DELETE from radcheck;")
+        qwifi.update_radcheck(db, cursor)
+        cursor.execute("SELECT * FROM radcheck;")
+        self.assertEqual(len(cursor.fetchall()), 2)
         db.close()
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
 
