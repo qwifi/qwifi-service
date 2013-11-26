@@ -59,9 +59,9 @@ class DataBaseTest(unittest.TestCase):
         #find all radcheck entries where value = reject (there should be zero)
         cursor.execute("SELECT * FROM radcheck WHERE value='Reject';")
         self.assertEqual(len(cursor.fetchall()), 0)
-        #find the rest of the entries in radcheck (there should be one)
+        #find the rest of the entries in radcheck (there should be four)
         cursor.execute("SELECT * FROM radcheck;")
-        self.assertEqual(len(cursor.fetchall()), 1)
+        self.assertEqual(len(cursor.fetchall()), 4)
         db.close()
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
 
@@ -101,7 +101,7 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SHOW TABLES LIKE 'radusergroup'")
         self.assertEqual(len(cursor.fetchall()),1)
 
-    def test_update_radcheck(self):
+    def test_update_radcheck_device(self):
         qwifi.parse_config_file("qwifi.conf")
         os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
@@ -109,9 +109,25 @@ class DataBaseTest(unittest.TestCase):
         cursor = db.cursor()
         #let updateRadcheck do it's job
         qwifi.update_radcheck(db, cursor)
-        #three new entries should be added to radcheck 3 (original) + 3 (new) == 6 entries
+        #three new entries should be added to radcheck 6 (original) + 3 (reject) == 6 entries
         cursor.execute("SELECT * from radcheck;")
-        self.assertEqual(len(cursor.fetchall()), 6)
+        self.assertEqual(len(cursor.fetchall()), 9)
+        db.close()
+        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
+
+    def test_update_radcheck_ap(self):
+        qwifi.parse_config_file("qwifi.conf")
+        qwifi.session_mode = qwifi.session_modes.AP
+        qwifi.Config.set("session", "timeout", '10')
+        os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
+        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
+        db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
+        cursor = db.cursor()
+        #let updateRadcheck do it's job
+        qwifi.update_radcheck(db, cursor)
+        #three new entries should be added to radcheck 6 (original) + 3 (reject) + 2 (regen) == 11 entries
+        cursor.execute("SELECT * from radcheck;")
+        self.assertEqual(len(cursor.fetchall()), 11)
         db.close()
         os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
 
