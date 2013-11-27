@@ -71,7 +71,7 @@ def parse_config_file(path):
         print "User Error", "File does NOT exist or file path NOT valid."
         raise
 
-
+#uses hostapd_cli to kick a device off the network
 def drop_connection(macAddr):
     drop_return = subprocess.call(["hostapd_cli", "disassociate", macAddr])
 
@@ -85,7 +85,7 @@ def db_error(tag, e):
     log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), log_levels.ERROR)
 
 
-
+#updates radcheck to signal connections that should be dropped/culled.
 def update_radcheck(dataBase, cursor):
     try:
         if session_mode == session_modes.DEVICE:
@@ -125,7 +125,7 @@ def update_radcheck(dataBase, cursor):
         dataBase.rollback()
         sys.exit()
 
-# Generate a list of freeloader connections (skips the first connection,
+# Generate a list of freeloader connections (skips the first connection associated with user x,
 # which is assumed to be valid)
 def freeloader_gen(duplicates):
     previous = ()
@@ -134,7 +134,7 @@ def freeloader_gen(duplicates):
             yield entry[1]
         previous = entry[0]
 
-
+#compiles a list of machines that should be kicked off the network then issues the command to kick them off all at once.
 def disassociate(cursor):
     cursor.execute(
         "SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
@@ -147,7 +147,7 @@ def disassociate(cursor):
         log("disassociate", "dropping %s" % mac_address, log_levels.DEBUG)
         threading.Thread(target=drop_connection(mac_address.replace('-', ':')))
 
-
+#removes outdated information from the database
 def cull(dataBase, cursor):
     try:
         cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
@@ -181,7 +181,7 @@ def log(tag, message, level):
     else:
             syslog.syslog("[INVALID] Tried to log with invalid level.")
 
-
+#the main controller of the service. Loops forever untill the service is killed. This is where everything happens!
 def main():
     global server
     global user
@@ -228,7 +228,7 @@ def parse_args():
     parser.add_argument("-c", default="qwifi.conf", help="allows you to designate where qwifi.conf is located.")
     return parser.parse_args()
 
-
+#set up the state of the service and launch the main controller function.
 if __name__ == '__main__':
     args = parse_args()
     if not os.path.exists("/var/run/qwifi.pid.lock"):
