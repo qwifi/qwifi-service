@@ -33,13 +33,9 @@ def config_section_map(section):
     dictionary = {}
     options = Config.options(section)
     for option in options:
-        try:
-            dictionary[option] = Config.get(section, option)
-            if dictionary[option] == -1:
-                print("skipping: %s" % option)
-        except:
-            print("exception on %s!" % option)
-            dictionary[option] = None
+        dictionary[option] = Config.get(section, option)
+        if dictionary[option] == -1:
+            print("skipping: %s" % option)
     return dictionary
 
 # variables from qwifi.conf
