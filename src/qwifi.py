@@ -1,17 +1,16 @@
 #!/usr/bin/python
 # For checking syslog quickly use in /var/log$ tail -f syslog
+from collections import namedtuple
 import MySQLdb
 import threading
 import time
 import sys, os
 import syslog
 import daemon.pidlockfile
-from collections import namedtuple
 import subprocess
-import ConfigParser
 import argparse
-import random
-import string
+import qwificore
+import pwgen
 
 modes = ("DAEMON", "FOREGROUND")
 modes = namedtuple("mode", modes)(*range(len(modes)))
@@ -24,64 +23,36 @@ log_level = log_levels.WARNING
 
 session_modes = ("DEVICE", "AP")
 session_modes = namedtuple("sessionModes", session_modes)(*range(len(session_modes)))
-session_mode = ""
 
-Config = ConfigParser.ConfigParser()
+session_mode = session_modes.DEVICE
 config_time_stamp = ""
-# Helper function for ConfigParser
-def config_section_map(section):
-    dictionary = {}
-    options = Config.options(section)
-    for option in options:
-        dictionary[option] = Config.get(section, option)
-        if dictionary[option] == -1:
-            print("skipping: %s" % option)
-    return dictionary
+config = {}
 
-# variables from qwifi.conf
-server = ""
-user = ""
-password = ""
-database = ""
-
-# set global configuration variables from configuration file
-def parse_config_file(path):
-    global server
-    global user
-    global password
-    global database
+def parse_config_file(config_file_path):
+    global config
     global log_level
     global session_mode
     global config_time_stamp
-    config_time_stamp = os.path.getmtime(path)
-    Config.read(path)
 
-    try:
-        server = config_section_map("database")['server']
-        user = config_section_map("database")['username']
-        password = config_section_map("database")['password']
-        database = config_section_map("database")['database']
-        log_level = log_levels._asdict()[config_section_map("logging")['level'].upper()]
-        session_mode = session_modes._asdict()[config_section_map("session")['mode'].upper()]
-    except ConfigParser.NoSectionError:
-        print "User Error", "File does NOT exist or file path NOT valid."
-        raise
+    config = qwificore.get_config(config_file_path)
+    log_level = log_levels._asdict()[config.get('logging', 'level').upper()]
+    session_mode = session_modes._asdict()[config.get('session', 'mode').upper()]
 
-#uses hostapd_cli to kick a device off the network
+    config_time_stamp = os.path.getmtime(config_file_path)
+
+# uses hostapd_cli to kick a device off the network
 def drop_connection(macAddr):
     drop_return = subprocess.call(["hostapd_cli", "disassociate", macAddr])
 
     if drop_return == 0:  # We dropped the connection successfully
         log("drop_connection", "MAC Address %s is being dropped." % macAddr, log_levels.DEBUG)
     else:
-        log("drop_connection", "An error occured while dropping the MAC Address of: %s" % macAddr, log_levels.ERROR)
-
+        log("drop_connection", "An error occurred while dropping the MAC Address of: %s" % macAddr, log_levels.ERROR)
 
 def db_error(tag, e):
     log(tag, "MySQL Error [%d]: %s" % (e.args[0], e.args[1]), log_levels.ERROR)
 
-
-#updates radcheck to signal connections that should be dropped/culled.
+# updates radcheck to signal connections that should be dropped/culled.
 def update_radcheck(dataBase, cursor):
     try:
         if session_mode == session_modes.DEVICE:
@@ -105,14 +76,32 @@ def update_radcheck(dataBase, cursor):
                     regen = True
 
             if regen:
-                pwsize = 10
-                username = 'qwifi' + ''.join(random.sample(string.ascii_lowercase, pwsize))
-                password = ''.join(random.sample(string.ascii_lowercase, pwsize))
+                pw_dict = pwgen.gen_user_pass()
+                username = 'qwifi' + pw_dict['username']
+                password = pw_dict['password']
+
+                for x in range (3):
+                    query = "SELECT username FROM radius.radacct WHERE username = '%s';" % username
+                    cursor.execute(query)
+                    result = cursor.fetchall()
+
+                    if len(result) > 0:
+                        # generate new username and password
+                        pw_dict = pwgen.gen_user_pass()
+                        username = 'qwifi' + pw_dict['username']
+                        password = pw_dict['password']
+                        x = x + 1
+
+                        if x == 3:
+                            return 'ERROR: Program could not generate a unique username.'
+                    else:
+                        break
+
                 query = "INSERT INTO radcheck SET username='%(username)s',attribute='Cleartext-Password',op=':=',value='%(password)s';" % {
                     'username': username, 'password': password}
                 cursor.execute(query)
                 query = "INSERT INTO radcheck (username,attribute,op,value) VALUES ('%(username)s', 'Vendor-Specific', ':=', DATE_FORMAT(UTC_TIMESTAMP() + INTERVAL %(timeout)s SECOND, '%%Y-%%m-%%d %%H:%%i:%%s'));" % {
-                    'username': username, 'timeout': Config.get('session', 'timeout')}
+                    'username': username, 'timeout': config.get('session', 'timeout')}
                 cursor.execute(query)
 
         dataBase.commit()
@@ -130,7 +119,7 @@ def freeloader_gen(duplicates):
             yield entry[1]
         previous = entry[0]
 
-#compiles a list of machines that should be kicked off the network then issues the command to kick them off all at once.
+# compiles a list of machines that should be kicked off the network then issues the command to kick them off all at once.
 def disassociate(cursor):
     cursor.execute(
         "SELECT radacct.callingstationId FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.value = 'Reject' AND radacct.acctstoptime is NULL AND radacct.username LIKE 'qwifi%';")
@@ -143,7 +132,7 @@ def disassociate(cursor):
         log("disassociate", "dropping %s" % mac_address, log_levels.DEBUG)
         threading.Thread(target=drop_connection(mac_address.replace('-', ':')))
 
-#removes outdated information from the database
+# removes outdated information from the database
 def cull(dataBase, cursor):
     try:
         cursor.execute("SELECT username FROM radcheck WHERE value = 'Reject';")
@@ -177,17 +166,17 @@ def log(tag, message, level):
     else:
             syslog.syslog("[INVALID] Tried to log with invalid level.")
 
-#the main controller of the service. Loops forever untill the service is killed. This is where everything happens!
+# the main controller of the service. Loops forever until the service is killed. This is where everything happens!
 def main():
-    global server
-    global user
-    global password
-    global database
-
     log('main', 'Started logging process on daemon', log_levels.DEBUG)
     while True:
         try:
-            db = MySQLdb.connect(server, user, password, database)
+            db = MySQLdb.connect(
+                config.get('database', 'server'),
+                config.get('database', 'username'),
+                config.get('database', 'password'),
+                config.get('database', 'database')
+            )
         except MySQLdb.Error, e:
             db_error("main", e)
             raise
@@ -224,7 +213,7 @@ def parse_args():
     parser.add_argument("-c", default="qwifi.conf", help="allows you to designate where qwifi.conf is located.")
     return parser.parse_args()
 
-#set up the state of the service and launch the main controller function.
+# set up the state of the service and launch the main controller function.
 if __name__ == '__main__':
     args = parse_args()
     if not os.path.exists("/var/run/qwifi.pid.lock"):
@@ -238,6 +227,7 @@ if __name__ == '__main__':
                 log('main', 'qwifi.pid File not found or program running without admin permissions', log_levels.ERROR)
                 print "Please run qwifi as admin."
                 sys.exit()
+
             parse_config_file(args.c)
             with daemon.DaemonContext(working_directory='.',
                                       pidfile=daemon.pidlockfile.PIDLockFile("/var/run/qwifi.pid"), stderr=sys.stderr):

@@ -6,29 +6,52 @@ import unittest
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
+sys.path.append('/usr/local/wsgi/resources/python/')
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../ui/resources/python/usr/local/wsgi/resources/python/'))
 import qwifi
 import MySQLdb
 from subprocess import call
 class DataBaseTest(unittest.TestCase):
+    def setUp(self):
+        global server
+        global user
+        global password
+        global database
+        global stdout_log
+
+        qwifi.parse_config_file("qwifi.conf")
+        server = qwifi.config.get('database', 'server')
+        user = qwifi.config.get('database', 'username')
+        password = qwifi.config.get('database', 'password')
+        database = qwifi.config.get('database', 'database')
+
+        stdout_log = open('test.out', 'a')
+        call(["sudo", "service", "mysql", "start"], stdout=stdout_log)
+
+    def tearDown(self):
+        global stdout_log
+
+        stdout_log.close()
+
     #test that parseConfigFile gets the correct values from config file
     def test_parse_config_file(self):
         #load config file
         qwifi.parse_config_file("test.conf")
         #make sure the expected values were loaded
-        self.assertEqual(qwifi.server, 'localhost')
-        self.assertEqual(qwifi.user,'root')
-        self.assertEqual(qwifi.database, 'radius')
-        self.assertEqual(qwifi.password, 'password')
+        self.assertEqual(qwifi.config.get('database', 'server'), 'localhost')
+        self.assertEqual(qwifi.config.get('database', 'username'),'root')
+        self.assertEqual(qwifi.config.get('database', 'database'), 'radius')
+        self.assertEqual(qwifi.config.get('database', 'password'), 'password')
         self.assertEqual(qwifi.log_level, 4)
         self.assertEqual(qwifi.session_mode, 0)
     
     def test_disassociate_query(self):
-        qwifi.parse_config_file("qwifi.conf")
+        db = MySQLdb.connect(server, user, password, database)
         #backup current radius database
-        os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
+        os.system("mysqldump -u " + user +" -p" + password + " " + database + " > " + "backup.sql" )
         #load the test database
-        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
-        db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
+        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "test.sql" )
+        db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
         #dissasociate's main query
         cursor.execute("INSERT INTO radcheck (username, attribute, op, value) SELECT radcheck.username, 'Auth-Type', ':=', 'Reject' FROM radcheck INNER JOIN radacct ON radcheck.username=radacct.username WHERE radcheck.attribute='Session-Timeout' AND TIMESTAMPDIFF(SECOND, radacct.acctstarttime, NOW()) > radcheck.value AND radacct.acctstoptime is NULL;")
@@ -42,13 +65,14 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(int(results[1][0]), 2)
         self.assertEqual(int(results[2][0]), 3)
         db.close()
-        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
+        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "backup.sql" )
 
     def test_cull(self):
-        qwifi.parse_config_file("qwifi.conf")
-        os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
-        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
-        db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
+        db = MySQLdb.connect(server, user, password, database)
+
+        os.system("mysqldump -u " + user +" -p" + password + " " + database + " > " + "backup.sql" )
+        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "test.sql" )
+        db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
         #insert a new value to make sure cull only deletes what we want
         cursor.execute('INSERT INTO radcheck (username) VALUES("testtest");')
@@ -63,24 +87,23 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SELECT * FROM radcheck;")
         self.assertEqual(len(cursor.fetchall()), 4)
         db.close()
-        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
+        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "backup.sql" )
 
 
     #test for graceful exception handling if mysql is off
     def test_db_connect_exception(self):
-       db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
-       cursor = db.cursor()
-       call(["sudo", "service", "mysql", "stop"])
-       self.assertRaises(MySQLdb.Error, qwifi.main)
-       with self.assertRaises(MySQLdb.OperationalError):
-           qwifi.update_radcheck(db, cursor)
-       with self.assertRaises(MySQLdb.Error):
-           qwifi.cull(db, cursor)
-       call(["sudo", "service", "mysql", "start"])
+        db = MySQLdb.connect(server, user, password, database)
+        cursor = db.cursor()
+        call(["sudo", "service", "mysql", "stop"], stdout=stdout_log)
+        self.assertRaises(MySQLdb.Error, qwifi.main)
+        with self.assertRaises(MySQLdb.OperationalError):
+            qwifi.update_radcheck(db, cursor)
+        with self.assertRaises(MySQLdb.Error):
+            qwifi.cull(db, cursor)
+        call(["sudo", "service", "mysql", "start"], stdout=stdout_log)
 
     def test_radius_exists(self):
-        qwifi.parse_config_file("qwifi.conf")
-        db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
+        db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
         cursor.execute("SHOW DATABASES LIKE 'radius'")
         rad = cursor.fetchall()
@@ -88,8 +111,7 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(len(rad),1)
 
     def test_tables_exist(self):
-        qwifi.parse_config_file("qwifi.conf")
-        db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
+        db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
         #these queries should all return a tuple of length 1
         cursor.execute("SHOW TABLES LIKE 'radacct'")
@@ -108,10 +130,10 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(len(cursor.fetchall()),1)
 
     def test_update_radcheck_device(self):
-        qwifi.parse_config_file("qwifi.conf")
-        os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
-        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
-        db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
+        qwifi.session_mode = qwifi.session_modes.DEVICE
+        os.system("mysqldump -u " + user +" -p" + password + " " + database + " > " + "backup.sql" )
+        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "test.sql" )
+        db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
         #let updateRadcheck do it's job
         qwifi.update_radcheck(db, cursor)
@@ -119,15 +141,14 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SELECT * from radcheck;")
         self.assertEqual(len(cursor.fetchall()), 9)
         db.close()
-        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
+        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "backup.sql" )
 
     def test_update_radcheck_ap(self):
-        qwifi.parse_config_file("qwifi.conf")
         qwifi.session_mode = qwifi.session_modes.AP
-        qwifi.Config.set("session", "timeout", '10')
-        os.system("mysqldump -u " + qwifi.user +" -p" + qwifi.password + " " + qwifi.database + " > " + "backup.sql" )
-        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "test.sql" )
-        db = MySQLdb.connect(qwifi.server,qwifi.user,qwifi.password,qwifi.database)
+        qwifi.config.set("session", "timeout", '10')
+        os.system("mysqldump -u " + user +" -p" + password + " " + database + " > " + "backup.sql" )
+        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "test.sql" )
+        db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
         #let updateRadcheck do it's job
         qwifi.update_radcheck(db, cursor)
@@ -139,7 +160,7 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SELECT * FROM radcheck;")
         self.assertEqual(len(cursor.fetchall()), 2)
         db.close()
-        os.system("mysql -u " + qwifi.user +" -p" + qwifi.password + " -h " + qwifi.server + " " + qwifi.database + " < " + "backup.sql" )
+        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "backup.sql" )
 
 
 if __name__ == '__main__':

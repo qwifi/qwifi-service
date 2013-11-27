@@ -3,9 +3,9 @@ import unittest
 import sys, os, ConfigParser
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
+sys.path.append('/usr/local/wsgi/resources/python/')
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../ui/resources/python/usr/local/wsgi/resources/python/'))
 import qwifi
-
-
 
 class UtilTest(unittest.TestCase):
     def test_freeload_gen(self):
@@ -16,6 +16,7 @@ class UtilTest(unittest.TestCase):
         self.assertEqual(actual_freeloaders, result,
                          "qwifi.freeloader_gen does not generate the correct values.\nGenerated Values:"
                          + str(actual_freeloaders) + "\ndoes not equal\nExpected:" + str(result))
+
     def test_parse_args(self):
         temp = sys.argv
         sys.argv = []
@@ -31,14 +32,6 @@ class UtilTest(unittest.TestCase):
         sys.argv.append("-n")
         args = qwifi.parse_args()
         self.assertEqual("Namespace(c='test', n=True)", str(args))
-
-    def test_config_section_map_exception(self):
-        with self.assertRaises(ConfigParser.NoSectionError):
-            qwifi.config_section_map("derp")
-
-    def test_parse_config_file_exception(self):
-        with self.assertRaises(ConfigParser.NoSectionError):
-            qwifi.parse_config_file('bad.conf')
 
 if __name__ == '__main__':
     unittest.main()

@@ -3,6 +3,8 @@ import unittest
 import sys, os
 from cStringIO import StringIO
 sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
+sys.path.append('/usr/local/wsgi/resources/python/')
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../ui/resources/python/usr/local/wsgi/resources/python/'))
 import qwifi
 
 
