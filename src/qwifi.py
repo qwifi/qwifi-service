@@ -12,6 +12,10 @@ import argparse
 import qwificore
 import pwgen
 
+#flag for terminating service
+terminate = False
+
+#Consider these namedtuples as enumerations
 modes = ("DAEMON", "FOREGROUND")
 modes = namedtuple("mode", modes)(*range(len(modes)))
 mode = modes.DAEMON
@@ -166,10 +170,14 @@ def log(tag, message, level):
     else:
             syslog.syslog("[INVALID] Tried to log with invalid level.")
 
+def terminate_service():
+    global terminate
+    terminate = True
 # the main controller of the service. Loops forever until the service is killed. This is where everything happens!
 def main():
+    global terminate
     log('main', 'Started logging process on daemon', log_levels.DEBUG)
-    while True:
+    while(not terminate):
         try:
             db = MySQLdb.connect(
                 config.get('database', 'server'),

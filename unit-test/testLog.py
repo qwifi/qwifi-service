@@ -75,6 +75,14 @@ class LogTest(unittest.TestCase):
             sys.stdout = real_stdout
             self._baseAssertEqual(myout.getvalue(), "[FG]level=DEBUG\n")
 
+        def test_drop_connection_fail_log(self):
+            qwifi.log_level = qwifi.log_levels.DEBUG
+            qwifi.drop_connection("309182")
+            f = open("/var/log/syslog")
+            lines = f.readlines()
+            self.assertEqual(lines[-1][-54:-1], "[drop_connection]MAC Address 309182 is being dropped.")
+            f.close()
+
 
 
 if __name__ == '__main__':

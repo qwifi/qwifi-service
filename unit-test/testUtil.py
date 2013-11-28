@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import unittest
-import sys, os, ConfigParser
+import sys, os, ConfigParser, threading, time
+from subprocess import call
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
 sys.path.append('/usr/local/wsgi/resources/python/')
@@ -18,7 +19,6 @@ class UtilTest(unittest.TestCase):
                          + str(actual_freeloaders) + "\ndoes not equal\nExpected:" + str(result))
 
     def test_parse_args(self):
-        temp = sys.argv
         sys.argv = []
         sys.argv.append("")
         sys.argv.append("-n")
@@ -32,6 +32,40 @@ class UtilTest(unittest.TestCase):
         sys.argv.append("-n")
         args = qwifi.parse_args()
         self.assertEqual("Namespace(c='test', n=True)", str(args))
+
+    def test_main(self):
+        #setup
+        r = open("qwifi.conf", "r")
+        lines = r.readlines()
+        r.close()
+        sys.argv = []
+        sys.argv.append("")
+        sys.argv.append("-c")
+        sys.argv.append("qwifi.conf")
+        qwifi.args = qwifi.parse_args()
+        qwifi.parse_config_file("qwifi.conf")
+        #launch main
+        t = threading.Thread(target=qwifi.main)
+        t.start()
+        self.assertTrue(t.is_alive())
+        time.sleep(5)
+        #change config file
+        w = open("qwifi.conf", "w+")
+        w.writelines([item for item in lines[0:-1]])
+        w.write("mode = AP")
+        w.close()
+        #continue test
+        self.assertTrue(t.is_alive())
+        time.sleep(5)
+        self.assertTrue(t.is_alive())
+        qwifi.terminate_service()
+        time.sleep(5)#this has to be before assertFalse. Otherwise main may be sleeping while assertFalse is called.
+        self.assertFalse(t.is_alive())
+        #reset config file
+        w = open("qwifi.conf", "w+")
+        w.writelines(item for item in lines)
+        w.close()
+
 
 if __name__ == '__main__':
     unittest.main()
