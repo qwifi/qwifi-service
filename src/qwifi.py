@@ -185,14 +185,9 @@ def main():
                 config.get('database', 'password'),
                 config.get('database', 'database')
             )
-        except MySQLdb.Error, e:
-            db_error("main", e)
-            raise
-        try:
             cursor = db.cursor()
         except MySQLdb.Error, e:
-            print "blah."
-            log("main", e, log_levels.ERROR)
+            db_error("main", e)
             raise
 
         # print "We have opened MySQLdb successfully!"
