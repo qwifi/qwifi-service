@@ -9,6 +9,24 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../ui/resources/pyth
 import qwifi
 
 class UtilTest(unittest.TestCase):
+    def setUp(self):
+        global server
+        global user
+        global password
+        global database
+        global stdout_log
+
+        qwifi.parse_config_file("qwifi.conf")
+        server = qwifi.config.get('database', 'server')
+        user = qwifi.config.get('database', 'username')
+        password = qwifi.config.get('database', 'password')
+        database = qwifi.config.get('database', 'database')
+        os.system("mysqldump -u " + user + " -p" + password + " " + database + " > " + "backup.sql")
+
+    def tearDown(self):
+        os.system("mysql -u " + user + " -p" + password + " -h " + server + " " + database + " < " + "backup.sql")
+
+
     def test_freeload_gen(self):
         test = (("name1", "mac_1", "date1"), ("name1", "mac_2", "date2"), ("name1", "mac_3", "date3"),
                 ("name2", "mac_4", "date1"), ("name2", "mac_5", "date5"), ("name2", "mac_6", "date6"))
@@ -35,6 +53,8 @@ class UtilTest(unittest.TestCase):
 
     def test_main(self):
         #setup
+        call(["sudo", "service", "hostapd", "start"])
+        os.system("mysql -u " + user + " -p" + password + " -h " + server + " " + database + " < " + "test.sql")
         r = open("qwifi.conf", "r")
         lines = r.readlines()
         r.close()

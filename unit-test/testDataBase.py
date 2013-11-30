@@ -27,10 +27,11 @@ class DataBaseTest(unittest.TestCase):
 
         stdout_log = open('test.out', 'a')
         call(["sudo", "service", "mysql", "start"], stdout=stdout_log)
+        os.system("mysqldump -u " + user + " -p" + password + " " + database + " > " + "backup.sql")
 
     def tearDown(self):
         global stdout_log
-
+        os.system("mysql -u " + user + " -p" + password + " -h " + server + " " + database + " < " + "backup.sql")
         stdout_log.close()
 
     #test that parseConfigFile gets the correct values from config file
@@ -47,8 +48,6 @@ class DataBaseTest(unittest.TestCase):
     
     def test_disassociate_query(self):
         db = MySQLdb.connect(server, user, password, database)
-        #backup current radius database
-        os.system("mysqldump -u " + user +" -p" + password + " " + database + " > " + "backup.sql" )
         #load the test database
         os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "test.sql" )
         db = MySQLdb.connect(server, user, password, database)
@@ -65,12 +64,9 @@ class DataBaseTest(unittest.TestCase):
         self.assertEqual(int(results[1][0]), 2)
         self.assertEqual(int(results[2][0]), 3)
         db.close()
-        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "backup.sql" )
 
     def test_cull(self):
         db = MySQLdb.connect(server, user, password, database)
-
-        os.system("mysqldump -u " + user +" -p" + password + " " + database + " > " + "backup.sql" )
         os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "test.sql" )
         db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
@@ -87,7 +83,6 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SELECT * FROM radcheck;")
         self.assertEqual(len(cursor.fetchall()), 4)
         db.close()
-        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "backup.sql" )
 
 
     #test for graceful exception handling if mysql is off
@@ -95,7 +90,8 @@ class DataBaseTest(unittest.TestCase):
         db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
         call(["sudo", "service", "mysql", "stop"], stdout=stdout_log)
-        self.assertRaises(MySQLdb.Error, qwifi.main)
+        with self.assertRaises(MySQLdb.Error):
+            qwifi.main()
         with self.assertRaises(MySQLdb.OperationalError):
             qwifi.update_radcheck(db, cursor)
         with self.assertRaises(MySQLdb.Error):
@@ -131,7 +127,6 @@ class DataBaseTest(unittest.TestCase):
 
     def test_update_radcheck_device(self):
         qwifi.session_mode = qwifi.session_modes.DEVICE
-        os.system("mysqldump -u " + user +" -p" + password + " " + database + " > " + "backup.sql" )
         os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "test.sql" )
         db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
@@ -141,12 +136,10 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SELECT * from radcheck;")
         self.assertEqual(len(cursor.fetchall()), 9)
         db.close()
-        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "backup.sql" )
 
     def test_update_radcheck_ap(self):
         qwifi.session_mode = qwifi.session_modes.AP
         qwifi.config.set("session", "timeout", '10')
-        os.system("mysqldump -u " + user +" -p" + password + " " + database + " > " + "backup.sql" )
         os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "test.sql" )
         db = MySQLdb.connect(server, user, password, database)
         cursor = db.cursor()
@@ -160,7 +153,7 @@ class DataBaseTest(unittest.TestCase):
         cursor.execute("SELECT * FROM radcheck;")
         self.assertEqual(len(cursor.fetchall()), 2)
         db.close()
-        os.system("mysql -u " + user +" -p" + password + " -h " + server + " " + database + " < " + "backup.sql" )
+
 
 
 if __name__ == '__main__':
