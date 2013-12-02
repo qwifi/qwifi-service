@@ -1,18 +1,22 @@
 #!/bin/bash
 if [ $# = 1 ]
 then
-    if [ $1 = 'all' -a "$(id -u)" = "0" ]
+    if [ "$(id -u)" != "0" ]
     then
-        python -m unittest discover
+            echo "Sorry, you are not root."
+    elif [ $1 = 'all' -a "$(id -u)" = "0" ]
+    then
+        coverage run -m --source=qwifi unittest discover
+	coverage report -m
     elif [ $1 = 'log' ]
     then
-        ./testLog.py
+        ./test_log.py
     elif [ $1 = 'db' ]
     then
-        ./testDataBase.py
+        ./test_data_base.py
     elif [ $1 = 'util' ]
     then
-        ./testUtil.py
+        ./test_util.py
     fi
 else
     if [ "$(id -u)" != "0" ]; then
